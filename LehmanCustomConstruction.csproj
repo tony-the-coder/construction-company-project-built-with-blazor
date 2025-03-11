@@ -15,6 +15,11 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Folder Include="Components\CustomerPortal\" />
+    <Folder Include="Components\Forms\" />
+    <Folder Include="Components\Shared\" />
+    <Folder Include="Components\UI\" />
+    <Folder Include="Components\Portfolio\" />
     <Folder Include="wwwroot\images\" />
   </ItemGroup>
 

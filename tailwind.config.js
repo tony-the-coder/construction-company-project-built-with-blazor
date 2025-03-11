@@ -5,9 +5,9 @@ module.exports = {
         './Pages/**/*.{razor,html,cs}',
         './Layout/**/*.{razor,html,cs}',
         './wwwroot/index.html',
-        "./node_modules/flowbite/**/*.js"
     ],
     plugins: [
-        require('flowbite/plugin')
+        require("flowbite/plugin"),
     ],
 };
+
