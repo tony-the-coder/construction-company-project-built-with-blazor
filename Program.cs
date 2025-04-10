@@ -4,6 +4,10 @@ using Microsoft.EntityFrameworkCore;
 using LehmanCustomConstruction.Components;
 using LehmanCustomConstruction.Components.Account;
 using LehmanCustomConstruction.Data;
+using LehmanCustomConstruction.Data.Blogs.Interfaces;
+using LehmanCustomConstruction.Data.Blogs.Repository;
+using Radzen;
+using Radzen.Blazor;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -15,25 +19,33 @@ builder.Services.AddCascadingAuthenticationState();
 builder.Services.AddScoped<IdentityUserAccessor>();
 builder.Services.AddScoped<IdentityRedirectManager>();
 builder.Services.AddScoped<AuthenticationStateProvider, IdentityRevalidatingAuthenticationStateProvider>();
-
+builder.Services.AddScoped<IBlogPostRepository, BlogPostRepository>();
 builder.Services.AddAuthentication(options =>
-    {
-        options.DefaultScheme = IdentityConstants.ApplicationScheme;
-        options.DefaultSignInScheme = IdentityConstants.ExternalScheme;
-    })
+{
+    options.DefaultScheme = IdentityConstants.ApplicationScheme;
+    options.DefaultSignInScheme = IdentityConstants.ExternalScheme;
+})
     .AddIdentityCookies();
-
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection") ?? throw new InvalidOperationException("Connection string 'DefaultConnection' not found.");
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseSqlServer(connectionString));
 builder.Services.AddDatabaseDeveloperPageExceptionFilter();
-
 builder.Services.AddIdentityCore<ApplicationUser>(options => options.SignIn.RequireConfirmedAccount = true)
     .AddEntityFrameworkStores<ApplicationDbContext>()
     .AddSignInManager()
     .AddDefaultTokenProviders();
-
 builder.Services.AddSingleton<IEmailSender<ApplicationUser>, IdentityNoOpEmailSender>();
+builder.Services.AddRadzenComponents();
+
+// Add HttpClient for Intuit API
+//builder.Services.AddHttpClient("IntuitAPI", client =>
+//{
+//    client.BaseAddress = new Uri("https://sandbox-quickbooks.api.intuit.com/");
+//    // You can add default headers or other configurations here if needed.
+//});
+
+// Register IntuitService
+//builder.Services.AddScoped<LehmanCustomConstruction.Services.IntuitService>(); // Add this line
 
 var app = builder.Build();
 
@@ -50,7 +62,6 @@ else
 }
 
 app.UseHttpsRedirection();
-
 
 app.UseAntiforgery();
 

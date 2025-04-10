@@ -1,0 +1,37 @@
+﻿@* @page "/quickbooks-auth" *@
+@* @inject IConfiguration Configuration *@
+@* @inject NavigationManager NavigationManager *@
+@* @using Intuit.Ipp.OAuth2PlatformClient; *@
+
+@* <h3>QuickBooks Authorization</h3> *@
+
+@* @* @if (string.IsNullOrEmpty(AuthorizationUrl)) *@ 
+@* @* { *@ 
+@* @*     <button @onclick="InitiateAuthorization">Authorize with QuickBooks</button> *@ 
+@* @* } *@ 
+@* @* else *@ 
+@* @* { *@ 
+@* @*     <p>Open this URL in your browser: <a href="@AuthorizationUrl" target="_blank">@AuthorizationUrl</a></p> *@
+@* @* } *@ 
+
+@* <button @onclick="InitiateAuthorization">Authorize with QuickBooks</button> *@
+
+@* @code { *@
+@*     private string AuthorizationUrl = null; // Ensure it's initialized *@
+@*     private OAuth2Client auth2Client; *@
+
+@*     private void InitiateAuthorization() *@
+@*     { *@
+@*         string clientId = Configuration["QuickBooks:clientid"]; *@
+@*         string clientSecret = Configuration["QuickBooks:clientsecret"]; *@
+@*         string redirectUrl = Configuration["QuickBooks:redirectUrl"]; *@
+@*         string environment = Configuration["QuickBooks:appEnvironment"]; *@
+
+@*         auth2Client = new OAuth2Client(clientId, clientSecret, redirectUrl, environment); *@
+
+@*         List<OidcScopes> scopes = new List<OidcScopes>(); *@
+@*         scopes.Add(OidcScopes.Accounting); *@
+
+@*         AuthorizationUrl = auth2Client.GetAuthorizationURL(scopes); *@
+@*     } *@
+@* } *@

@@ -8,10 +8,13 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="IppDotNetSdkForQuickBooksApiV3" Version="14.7.0" />
+    <PackageReference Include="IppOAuth2PlatformSdk" Version="14.0.0" />
     <PackageReference Include="Microsoft.AspNetCore.Diagnostics.EntityFrameworkCore" Version="9.0.2" />
     <PackageReference Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="9.0.2" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="9.0.2" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Tools" Version="9.0.2" />
+    <PackageReference Include="Radzen.Blazor" Version="6.4.0" />
   </ItemGroup>
 
   <ItemGroup>
@@ -20,7 +23,7 @@
     <Folder Include="Components\Shared\" />
     <Folder Include="Components\UI\" />
     <Folder Include="Components\Portfolio\" />
-    <Folder Include="wwwroot\images\" />
+    <Folder Include="wwwroot\images\logos\" />
   </ItemGroup>
 
 </Project>

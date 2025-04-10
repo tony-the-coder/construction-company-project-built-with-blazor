@@ -1,0 +1,12 @@
+﻿@page "/callback"
+
+<h3>Simple Callback Test</h3>
+
+<button type="button" class="test-button">Test Button</button>
+
+@code {
+    protected override void OnInitialized()
+    {
+        Console.WriteLine("Callback.razor initialized.");
+    }
+}
