@@ -28,5 +28,15 @@ public class ApplicationDbContext(DbContextOptions<ApplicationDbContext> options
             .HasOne(bc => bc.BlogCategory)
             .WithMany(c => c.BlogPostCategories)
             .HasForeignKey(bc => bc.BlogCategoryId);
+
+
+        builder.Entity<BlogCategory>().HasData(
+        new BlogCategory { ID = 1, Name = "Company News", Slug = "company-news" },
+        new BlogCategory { ID = 2, Name = "Project Spotlights", Slug = "project-spotlights" },
+        new BlogCategory { ID = 3, Name = "Design Ideas", Slug = "design-ideas" },
+        new BlogCategory { ID = 4, Name = "Construction Tips", Slug = "construction-tips" }
+        // Add any other essential starting categories
+    );
     }
+
 }

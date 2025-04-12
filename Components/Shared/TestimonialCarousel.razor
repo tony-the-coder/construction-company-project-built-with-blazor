@@ -1,0 +1,75 @@
+﻿@* --- File: Components/Shared/TestimonialCarousel.razor (Using @foreach) --- *@
+@* @inject ITestimonialService TestimonialService - Inject real service later *@
+
+@if (testimonials == null || !testimonials.Any())
+{
+    <p><em>Loading testimonials...</em></p> @* Show simple text if list is null or empty *@
+}
+else
+{
+    <div class="bg-white py-12 sm:py-16">
+        @* Section background and padding *@
+        <div class="max-w-screen-lg mx-auto px-4 sm:px-6 lg:px-8">
+            <h2 class="text-3xl font-bold tracking-tight text-center text-gray-900 mb-10">
+                What Our Clients Say
+            </h2>
+            <RadzenCarousel Data="@testimonials" TItem="Testimonial" 
+                            Style="height: 300px;"
+                            AllowTransitions="true"
+                            AllowNavigation="true" 
+                            PagerPosition="PagerPosition.Bottom" 
+                            Auto="false" 
+                            ButtonStyle="ButtonStyle.Base"
+                            Variant="Variant.Text"
+                            Shade="Shade.Lighter"
+                            ButtonSize="ButtonSize.Medium">
+                <Items>
+                    @* --- Use @foreach and RadzenCarouselItem --- *@
+                    @foreach (var testimonial in testimonials) @* Loop through the data list *@
+                    {
+                        <RadzenCarouselItem>
+                            @* Wrap each item's content *@
+                            @* --- Put slide content directly inside item --- *@
+                            <div class="flex flex-col items-center justify-center h-full text-center px-4 md:px-16">
+                                <p class="text-xl italic text-gray-700 mb-4">"@testimonial.Quote"</p> @* Access loop variable *@
+                                <p class="font-semibold text-gray-900">- @testimonial.AuthorName</p> @* Access loop variable *@
+                            </div>
+                        </RadzenCarouselItem>
+                    }
+                    @* --- End Foreach --- *@
+                </Items>
+            </RadzenCarousel>
+        </div>
+    </div>
+}
+
+@code {
+    // Placeholder list to hold testimonials
+    private List<Testimonial> testimonials = new();
+
+    // --- Placeholder Data Loading ---
+    protected override void OnInitialized()
+    {
+        LoadSampleTestimonials();
+        base.OnInitialized();
+    }
+
+    // --- Generates Sample Data ---
+    private void LoadSampleTestimonials()
+    {
+        testimonials = new List<Testimonial> {
+             new Testimonial { Quote = "Customer 1 saying very positive things...", AuthorName = "Client A, Mountain Retreat"},
+             new Testimonial { Quote = "Customer 2 praising the team's professionalism...", AuthorName = "Client B, Coastal Home"},
+             new Testimonial { Quote = "Customer 3 absolutely loves their renovated kitchen...", AuthorName = "Client C, City Renovation"},
+             new Testimonial { Quote = "Customer 4 highlights the quality craftsmanship...", AuthorName = "Client D, Modern Farmhouse"},
+             new Testimonial { Quote = "Customer 5 found the experience stress-free...", AuthorName = "Client E, Lakefront Property"}
+         };
+    }
+
+    // --- Placeholder Class Definition ---
+    private class Testimonial
+    {
+        public string Quote { get; set; } = "";
+        public string AuthorName { get; set; } = "";
+    }
+}
