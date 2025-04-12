@@ -1,0 +1,37 @@
+﻿@inject NavigationManager NavManager
+
+
+<div class="bg-[#f7d0b6] py-20">
+    @* <--Change this background color later *@
+    <div class="max-w-screen-lg mx-auto flex justify-between items-center">
+        <div class="max-w-xl">
+            <h2 class="font-black text-sky-950 text-3xl mb-4">@CTATitle</h2> @* <-- Placeholder Title *@
+            <p class="text-base text-sky-950">@CTASubtitle</p> @* <-- Placeholder Subtitle *@
+        </div>
+        <RadzenButton Shade="Shade.Lighter"
+                      Click="@NavigateToLink"
+                      Text="@CTAButtonText"
+                      ButtonStyle="ButtonStyle.Primary" />
+    </div>
+</div>
+
+@code {
+
+    [Parameter]
+    public string? CTATitle { get; set; } = "Default Title"; 
+    [Parameter]
+    public string? CTASubtitle { get; set; } = "Default Subtitle";
+    [Parameter]
+    public string CTAButtonText { get; set; } = "Default Button Text";
+    [Parameter]
+    public string CTAButtonLink { get; set; } = "#";
+
+    private void NavigateToLink()
+    {
+        if (!string.IsNullOrEmpty(CTAButtonLink))
+        {
+            NavManager.NavigateTo(CTAButtonLink);
+        }
+    }
+}
+

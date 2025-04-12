@@ -1,41 +1,36 @@
-﻿@using LehmanCustomConstruction.Components.Hero
+﻿@page "/"
 
-@page "/"
-
-@* <HeroSection /> *@
 <PageTitle>Lehman Custom Construction</PageTitle>
 
-<HeroSection2 />
 
-<RadzenButton Click="@ButtonClicked" Text="Hi"></RadzenButton>
-@* <button id="dropdownDefaultButton" data-dropdown-toggle="dropdown" class="text-white bg-blue-700 hover:bg-blue-800 focus:ring-4 focus:outline-none focus:ring-blue-300 font-medium rounded-lg text-sm px-5 py-2.5 text-center inline-flex items-center dark:bg-blue-600 dark:hover:bg-blue-700 dark:focus:ring-blue-800" type="button"> *@
-@*     Dropdown button <svg class="w-2.5 h-2.5 ml-2.5" aria-hidden="true" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 10 6"> *@
-@*         <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="m1 1 4 4 4-4" /> *@
-@*     </svg> *@
-@* </button> *@
+<Hero />
+<CallToActionBanner CTATitle="Ready to build your dream home?"
+                    CTASubtitle="Contact us for a consultation and let's discuss your vision"
+                    CTAButtonText="Get In Touch"
+                    CTAButtonLink="#" />
+<ImageOnLeft AboveImageHeading="Uncompromising Quality"
+             ImageHeading="Craftsmanship That Endures"
+             ImageText="From foundation to finishing touches, we use only the finest materials and techniques to ensure your home is built to last for generations."
+             ImageUrl="https://picsum.photos/800/600?grayscale&blur=2"
+             ButtonText="Our Building Process"
+             ButtonLink="/process" />
 
-<!-- Dropdown menu to test TailWind implementation-->
-@* <div id="dropdown" class="z-10 hidden bg-white divide-y divide-gray-100 rounded-lg shadow-sm w-44 dark:bg-gray-700"> *@
-@*     <ul class="py-2 text-sm text-gray-700 dark:text-gray-200" aria-labelledby="dropdownDefaultButton"> *@
-@*         <li> *@
-@*             <a href="#" class="block px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-600 dark:hover:text-white">Test</a> *@
-@*         </li> *@
-@*         <li> *@
-@*             <a href="#" class="block px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-600 dark:hover:text-white">Settings</a> *@
-@*         </li> *@
-@*         <li> *@
-@*             <a href="#" class="block px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-600 dark:hover:text-white">Earnings</a> *@
-@*         </li> *@
-@*         <li> *@
-@*             <a href="#" class="block px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-600 dark:hover:text-white">Sign out</a> *@
-@*         </li> *@
-@*     </ul> *@
-@* </div> *@
+<ImageOnRight AboveImageHeading="Your Vision, Our Expertise"
+              ImageHeading="Truly Custom Design"
+              ImageText="We work closely with you and renowned architects to translate your unique vision into a functional, beautiful, and personalized living space."
+              ImageUrl="https://picsum.photos/800/600?grayscale&blur=2"
+              ButtonText="Explore Floor Plans"
+              ButtonLink="/floorplans" />
 
-<RadzenButton Click="@ButtonClicked" Text="Hi"></RadzenButton>
+<ImageOnLeft AboveImageHeading="Uncompromising Quality"
+             ImageHeading="Craftsmanship That Endures"
+             ImageText="From foundation to finishing touches, we use only the finest materials and techniques to ensure your home is built to last for generations."
+             ImageUrl="https://picsum.photos/800/600?grayscale&blur=2"
+             ButtonText="Our Building Process"
+             ButtonLink="/process" />
+
+
+
 @code {
-  void ButtonClicked()
-  {
-    // Handle the Click event of RadzenButton
-  }
-}
+
+} 

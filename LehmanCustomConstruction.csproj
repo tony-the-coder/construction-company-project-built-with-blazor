@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk.Web">
+﻿<Project Sdk="Microsoft.NET.Sdk.Web">
 
   <PropertyGroup>
     <TargetFramework>net9.0</TargetFramework>
@@ -14,15 +14,15 @@
     <PackageReference Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="9.0.2" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="9.0.2" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Tools" Version="9.0.2" />
-    <PackageReference Include="Radzen.Blazor" Version="6.4.0" />
+    <PackageReference Include="Radzen.Blazor" Version="6.5.2" />
   </ItemGroup>
 
   <ItemGroup>
     <Folder Include="Components\CustomerPortal\" />
     <Folder Include="Components\Forms\" />
-    <Folder Include="Components\Shared\" />
     <Folder Include="Components\UI\" />
     <Folder Include="Components\Portfolio\" />
+    <Folder Include="dead-ideas\" />
     <Folder Include="wwwroot\images\logos\" />
   </ItemGroup>
 

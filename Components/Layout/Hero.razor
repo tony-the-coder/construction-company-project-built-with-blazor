@@ -1,0 +1,30 @@
+﻿<div class="w-screen h-screen overflow-hidden relative before:block before:absolute before:bg-black before:h-full before:w-full before:top-0 before:left-0 before:z-10 before:opacity-30">
+    <img src="@ImageUrl" class="absolute top-0 left-0 min-h-full ob" alt=""> @* <-- Needs object-cover? class="ob"? *@
+    <div class="relative z-20 max-w-screen-lg mx-auto grid grid-cols-12 h-full items-center">
+        <div class="col-span-6">
+            <span class="uppercase text-white text-xs font-bold mb-2 block">@Title</span>
+            <h1 class="text-white font-extrabold text-5xl mb-8">@Subtitle</h1>
+            <p class="text-stone-100 text-base">
+                @Description
+            </p>
+            <button href="@ButtonLink" class="mt-8 text-white uppercase py-4 text-base font-light px-10 border border-white hover:bg-white hover:bg-opacity-10">@ButtonText</button>
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter]
+    public string? Title { get; set; } = "Lehman Custom Construction";
+    [Parameter]
+    public string? Subtitle { get; set; } = "We are experts in construction and renovation";
+    [Parameter]
+    public string? Description { get; set; } = "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.";
+    [Parameter]
+    public string? ImageUrl { get; set; } = "https://picsum.photos/seed/picsum/1900/850";
+    [Parameter]
+    public string? ButtonText { get; set; } = "Get started";
+    [Parameter]
+    public string? ButtonLink { get; set; } = "#";
+    
+
+}
