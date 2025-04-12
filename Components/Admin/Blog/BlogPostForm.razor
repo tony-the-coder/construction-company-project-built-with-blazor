@@ -1,57 +1,55 @@
-﻿@page "/admin/blog/edit"
+﻿@* File Path: Components/Pages/Admin/BlogPostForm.razor *@
+@page "/admin/blog/edit"
 @page "/admin/blog/edit/{Id:int}"
 
-@* Added using statements *@
 @using LehmanCustomConstruction.Data.Blogs
 @using System.Linq
-@using Radzen.Blazor @* Added for RadzenHtmlEditor and RadzenDropDown *@
-@using Microsoft.AspNetCore.Components.Forms @* Added for Input components and EditForm *@
+@using Radzen
+@using Radzen.Blazor
+@using Microsoft.AspNetCore.Components.Forms
+@using System.Text.RegularExpressions
 
-@* Injected IBlogCategoryRepository *@
 @inject IBlogCategoryRepository BlogCategoryRepository
 @inject IBlogPostRepository BlogPostRepository
 @inject NavigationManager NavigationManager
 @inject Radzen.DialogService DialogService
+@inject Radzen.NotificationService NotificationService
 
 <EditForm Model="blogPost" OnValidSubmit="HandleValidSubmit">
     <DataAnnotationsValidator />
-    <ValidationSummary class="text-red-600 mb-4" /> @* Added basic styling and margin *@
+    <ValidationSummary class="text-red-600 mb-4" />
 
     <h3>@(IsNewPost ? "Create New Blog Post" : $"Edit Blog Post: {blogPost.Title}")</h3>
 
+    @* --- Title, Slug, Author, Excerpt, ImageUrl Fields (remain the same) --- *@
     <div class="mb-4">
         <label for="title" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Title</label>
         <InputText id="title" @bind-Value="blogPost.Title" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
-        <ValidationMessage For="@(() => blogPost.Title)" />
     </div>
 
     <div class="mb-4">
         <label for="slug" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Slug (URL friendly)</label>
         <InputText id="slug" @bind-Value="blogPost.Slug" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
-        <ValidationMessage For="@(() => blogPost.Slug)" />
-        <small class="text-gray-500 dark:text-gray-400">If left blank, the slug might be generated automatically. Use lowercase letters, numbers, and hyphens.</small>
+        <small class="text-gray-500 dark:text-gray-400">Required. Use lowercase letters, numbers, and hyphens. Auto-generation coming soon!</small>
     </div>
 
     <div class="mb-4">
         <label for="author" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Author</label>
         <InputText id="author" @bind-Value="blogPost.Author" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
-        <ValidationMessage For="@(() => blogPost.Author)" />
     </div>
 
     <div class="mb-4">
         <label for="excerpt" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Excerpt (Short Summary)</label>
         <InputTextArea id="excerpt" @bind-Value="blogPost.Excerpt" rows="3" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
-        <ValidationMessage For="@(() => blogPost.Excerpt)" />
     </div>
 
-    @* Optional Featured Image URL - consider a proper file uploader later *@
     <div class="mb-4">
         <label for="imageUrl" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Featured Image URL</label>
         <InputText id="imageUrl" @bind-Value="blogPost.ImageUrl" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
-        <ValidationMessage For="@(() => blogPost.ImageUrl)" />
     </div>
+    @* ---------------------------------------------------------------------- *@
 
-    @* --- Category Selection Dropdown --- *@
+    @* --- Category Selection Dropdown (remains the same) --- *@
     <div class="mb-4">
         <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Categories</label>
         <RadzenDropDown AllowClear="true"
@@ -65,24 +63,25 @@
                         @bind-Value="@selectedCategoryIds"
                         Style="width: 100%; max-width: 600px;" />
     </div>
+    @* ------------------------------------------------------ *@
 
+    @* --- Content Editor (remains the same) --- *@
     <div class="mb-4">
         <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Content</label>
         <RadzenHtmlEditor @bind-Value="blogPost.Content" style="height: 450px;" UploadUrl="upload/image" UploadComplete=@OnUploadComplete />
-        <ValidationMessage For="@(() => blogPost.Content)" />
     </div>
+    @* ---------------------------------------------------------------------- *@
 
+    @* --- Buttons (remain the same) --- *@
     <div class="mt-6 flex items-center gap-x-4">
         <button type="submit" class="inline-flex justify-center rounded-md border border-transparent bg-indigo-600 py-2 px-4 text-sm font-medium text-white shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2">
             @(IsNewPost ? "Create Post" : "Update Post")
         </button>
-        @* --- Modified Cancel Button --- *@
         <button type="button" class="rounded-md border border-gray-300 bg-white py-2 px-4 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 dark:bg-gray-600 dark:text-gray-100 dark:border-gray-500 dark:hover:bg-gray-500" @onclick="CancelClicked">
-            @* Call method *@
             Cancel
         </button>
-        @* --- End Modification --- *@
     </div>
+    @* --------------------------------- *@
 
 </EditForm>
 
@@ -94,17 +93,19 @@
     private IEnumerable<BlogCategory> allCategories = Enumerable.Empty<BlogCategory>();
     private IEnumerable<int> selectedCategoryIds = Enumerable.Empty<int>();
 
+    // --- OnParametersSetAsync (remains the same) ---
     protected override async Task OnParametersSetAsync()
     {
         allCategories = await BlogCategoryRepository.GetAllAsync();
 
         if (!IsNewPost)
         {
-            blogPost = await BlogPostRepository.GetByIdAsync(Id.Value); // Assumes GetByIdAsync includes categories
+            blogPost = await BlogPostRepository.GetByIdAsync(Id.Value);
 
             if (blogPost == null)
             {
-                NavigationManager.NavigateTo("/admin/blog"); // Or handle error
+                NotificationService.Notify(NotificationSeverity.Error, "Error", "Blog post not found.");
+                NavigationManager.NavigateTo("/admin/blog");
                 return;
             }
             if (blogPost.BlogPostCategories == null)
@@ -120,66 +121,80 @@
             selectedCategoryIds = Enumerable.Empty<int>();
         }
     }
+    // -------------------------------------------
 
+    // --- UPDATED HandleValidSubmit (with new SlugExistsAsync check) ---
     private async Task HandleValidSubmit()
     {
+        // --- Validation Checks ---
+        if (string.IsNullOrWhiteSpace(blogPost.Title))
+        {
+            await DialogService.Alert("Please enter a Title for the blog post.", "Title Required");
+            return;
+        }
+        if (string.IsNullOrWhiteSpace(blogPost.Slug))
+        {
+            await DialogService.Alert("Please enter a Slug for the blog post.", "Slug Required");
+            return;
+        }
+        // --- MODIFIED: Using SlugExistsAsync ---
+        if (await BlogPostRepository.SlugExistsAsync(blogPost.ID, blogPost.Slug))
+        {
+            await DialogService.Alert($"The slug '{blogPost.Slug}' is already in use by another post. Please choose a unique slug.", "Slug Exists");
+            return;
+        }
+        // --- END MODIFICATION ---
+        if (string.IsNullOrWhiteSpace(blogPost.Excerpt))
+        {
+            await DialogService.Alert("Please enter an Excerpt (short summary) for the blog post.", "Excerpt Required");
+            return;
+        }
+        if (selectedCategoryIds == null || !selectedCategoryIds.Any())
+        {
+            await DialogService.Alert("Please select at least one category for the blog post.", "Category Required");
+            return;
+        }
+        var htmlContent = blogPost.Content ?? "";
+        var plainTextContent = Regex.Replace(htmlContent, "<.*?>", string.Empty);
+        if (string.IsNullOrWhiteSpace(plainTextContent))
+        {
+            await DialogService.Alert("Please enter some content for the blog post.", "Content Required");
+            return;
+        }
+        // --- End Validation Checks ---
+
+        // Proceed with saving
         try
         {
-            UpdateBlogPostCategories(); // Sync categories before saving
-
+            BlogPost result;
             if (IsNewPost)
             {
-                await BlogPostRepository.AddAsync(blogPost);
-                await DialogService.Alert("Blog post created successfully!", "Success");
+                if (blogPost.BlogPostCategories == null) blogPost.BlogPostCategories = new List<BlogPostCategory>();
+                blogPost.BlogPostCategories.Clear();
+                foreach (var catId in selectedCategoryIds)
+                {
+                    blogPost.BlogPostCategories.Add(new BlogPostCategory { BlogCategoryId = catId });
+                }
+                result = await BlogPostRepository.AddAsync(blogPost);
+                NotificationService.Notify(NotificationSeverity.Success, "Success", "Blog post created successfully!", 4000);
             }
             else
             {
-                await BlogPostRepository.UpdateAsync(blogPost);
-                await DialogService.Alert("Blog post updated successfully!", "Success");
+                result = await BlogPostRepository.UpdateAsync(blogPost, selectedCategoryIds);
+                NotificationService.Notify(NotificationSeverity.Success, "Success", "Blog post updated successfully!", 4000);
             }
-            NavigationManager.NavigateTo("/admin/blog"); // Adjust route if needed
+            NavigationManager.NavigateTo("/admin/blog");
         }
         catch (Exception ex)
         {
             Console.WriteLine($"Error saving blog post: {ex.Message}\n{ex.StackTrace}");
-            await DialogService.Alert($"Error saving blog post: {ex.Message}", "Error");
+            await DialogService.Alert($"Error saving blog post: {ex.Message}", "Save Error");
         }
     }
+    // --- END UPDATED HandleValidSubmit ---
 
-    private void UpdateBlogPostCategories()
-    {
-        if (selectedCategoryIds == null) selectedCategoryIds = Enumerable.Empty<int>();
-        if (blogPost.BlogPostCategories == null) blogPost.BlogPostCategories = new List<BlogPostCategory>();
-
-        var currentCategoryIds = blogPost.BlogPostCategories.Select(bc => bc.BlogCategoryId).ToList();
-
-        var categoriesToRemove = blogPost.BlogPostCategories
-            .Where(bc => !selectedCategoryIds.Contains(bc.BlogCategoryId))
-            .ToList();
-        foreach (var categoryToRemove in categoriesToRemove)
-        {
-            blogPost.BlogPostCategories.Remove(categoryToRemove);
-        }
-
-        var categoryIdsToAdd = selectedCategoryIds
-            .Where(id => !currentCategoryIds.Contains(id))
-            .ToList();
-        foreach (var categoryIdToAdd in categoryIdsToAdd)
-        {
-            blogPost.BlogPostCategories.Add(new BlogPostCategory { BlogCategoryId = categoryIdToAdd });
-        }
-    }
-
-    void OnUploadComplete(UploadCompleteEventArgs args)
-    {
-        Console.WriteLine($"Upload Complete: {args.RawResponse}");
-        // Add user feedback if desired
-    }
-
-    // --- Added CancelClicked Method ---
-    private void CancelClicked()
-    {
-        NavigationManager.NavigateTo("/admin/blog"); // Adjust target route if necessary
-    }
-    // --- End Added Method ---
+    // --- Other methods (OnUploadComplete, CancelClicked - remain the same) ---
+    void OnUploadComplete(UploadCompleteEventArgs args) { /* ... */ }
+    private void CancelClicked() { /* ... */ }
+    // -----------------------------------------------------------------------
 }

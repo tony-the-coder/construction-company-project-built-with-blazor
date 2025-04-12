@@ -1,5 +1,4 @@
-﻿// In Data/Blogs/Interfaces/IBlogCategoryRepository.cs
-using LehmanCustomConstruction.Data.Blogs;
+﻿using LehmanCustomConstruction.Data.Blogs;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 
@@ -8,7 +7,11 @@ namespace LehmanCustomConstruction.Data.Blogs.Interfaces
     public interface IBlogCategoryRepository
     {
         Task<IEnumerable<BlogCategory>> GetAllAsync();
-        // Add other methods later if needed (GetById, Add, Update, Delete)
-        // For the dropdown, GetAllAsync is the primary requirement.
+        Task<BlogCategory?> GetByIdAsync(int categoryId); 
+        Task<BlogCategory> AddAsync(BlogCategory category); 
+        Task<BlogCategory> UpdateAsync(BlogCategory category); 
+        Task<bool> DeleteAsync(int categoryId); 
+     
+        // Task<bool> SlugExistsAsync(int currentCategoryId, string slug);
     }
 }

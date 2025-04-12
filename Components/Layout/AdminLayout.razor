@@ -1,0 +1,91 @@
+﻿@* File: Components/Layout/AdminLayout.razor *@
+@using Microsoft.AspNetCore.Components.Sections @* Keep if you plan to use sections later *@
+
+
+<RadzenDialog /> 
+<RadzenNotification />
+<RadzenContextMenu />
+<RadzenTooltip />
+
+@inherits LayoutComponentBase
+@layout MainLayout 
+
+@* Main container using Flexbox for sidebar + content layout *@
+<div class="flex min-h-screen bg-gray-50 dark:bg-gray-900"> @* Adjust min-h based on MainLayout header/footer height if needed *@
+
+    @* Sidebar Navigation *@
+    <aside class="w-64 flex-shrink-0 bg-white dark:bg-gray-800 p-4 border-r border-gray-200 dark:border-gray-700 flex flex-col">
+        
+        @* Optional: Placeholder for Logo or Admin Title *@
+        <div class="mb-4 text-center">
+             <a href="/" class="inline-block"> @* Link back to home or dashboard *@
+                 <img src="/images/Using-this-logo-during-dev.jpg" alt="Lehman Logo" class="h-10 mx-auto"/> 
+             </a>
+             <p class="mt-2 text-sm font-semibold text-gray-700 dark:text-gray-200">Admin Panel</p>
+        </div>
+
+        @* Optional: User Welcome (Requires AuthenticationStateProvider injection if used here) *@
+         @*
+         <AuthorizeView>
+             <Authorized>
+                 <p class="mb-4 text-xs text-center text-gray-500 dark:text-gray-400">
+                     Welcome, @context.User?.Identity?.Name!
+                 </p>
+             </Authorized>
+         </AuthorizeView>
+        *@
+
+        <hr class="border-gray-200 dark:border-gray-600 my-2">
+
+        @* Navigation Links using Flex column and spacing *@
+        <nav class="flex-grow flex flex-col space-y-1"> @* flex-grow allows nav to take space, pushing logout down potentially *@
+            
+            @* Example NavLink Styling (Apply similar styling to others) *@
+            <NavLink href="admin/blog" Match="NavLinkMatch.Prefix"
+                     class="flex items-center px-3 py-2 rounded-md text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+                     ActiveClass="bg-gray-100 dark:bg-gray-700 text-indigo-600 dark:text-indigo-400 font-semibold">
+                @* Optional: Add an Icon here using SVG or an icon library *@
+                <span class="ml-3">Manage Blog Posts</span>
+            </NavLink>
+
+            <NavLink href="admin/categories"
+                     class="flex items-center px-3 py-2 rounded-md text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+                     ActiveClass="bg-gray-100 dark:bg-gray-700 text-indigo-600 dark:text-indigo-400 font-semibold">
+                <span class="ml-3">Manage Categories</span>
+            </NavLink>
+
+            <NavLink href="admin/subscribers"
+                     class="flex items-center px-3 py-2 rounded-md text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+                     ActiveClass="bg-gray-100 dark:bg-gray-700 text-indigo-600 dark:text-indigo-400 font-semibold">
+                <span class="ml-3">Manage Subscribers</span>
+            </NavLink>
+
+            @* Add other admin links here following the same pattern *@
+
+        </nav>
+
+        @* Logout Button/Form at the bottom *@
+        <div class="mt-auto pt-4 border-t border-gray-200 dark:border-gray-600">
+            @* Ensure your LogoutForm component uses appropriate Tailwind classes internally,
+               or render a simple logout button/link here. *@
+            @* <LogoutForm /> *@
+            
+            @* Placeholder Logout Button using basic Tailwind classes *@
+            <button @* Add appropriate @onclick or form submission logic *@
+                class="w-full flex items-center justify-center px-3 py-2 rounded-md text-sm font-medium text-red-700 dark:text-red-400 bg-red-100 dark:bg-red-900 hover:bg-red-200 dark:hover:bg-red-800">
+                Logout (Placeholder)
+            </button>
+        </div>
+    </aside>
+
+    @* Main Content Area *@
+    <main class="flex-1 p-6 overflow-y-auto bg-gray-50 dark:bg-gray-900">
+        @* The @Body directive renders the content of the specific admin page *@
+        @Body
+    </main>
+
+</div>
+
+@code {
+    // Code behind for the layout if needed (e.g., injecting AuthenticationStateProvider for the welcome message)
+}

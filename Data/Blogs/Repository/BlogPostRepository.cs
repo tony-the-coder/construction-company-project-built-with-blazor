@@ -1,93 +1,142 @@
-﻿using LehmanCustomConstruction.Data; // Ensure this is present for ApplicationDbContext
-using LehmanCustomConstruction.Data.Blogs; // Ensure this is present for BlogPost
+﻿// File Path: Data/Blogs/Repository/BlogPostRepository.cs
 using LehmanCustomConstruction.Data.Blogs.Interfaces;
-using Microsoft.EntityFrameworkCore; // Required for .Include() and other EF methods
-using System.Collections.Generic; // Required for IEnumerable
-using System.Linq; // Required for OrderBy, Where etc. (though not used in GetByIdAsync change)
-using System.Threading.Tasks; // Required for async Task
+using Microsoft.EntityFrameworkCore;
 
 namespace LehmanCustomConstruction.Data.Blogs.Repository
 {
     public class BlogPostRepository : IBlogPostRepository
     {
-        private readonly ApplicationDbContext _context;
+        private readonly IDbContextFactory<ApplicationDbContext> _contextFactory;
 
-        public BlogPostRepository(ApplicationDbContext context)
+        public BlogPostRepository(IDbContextFactory<ApplicationDbContext> contextFactory)
         {
-            _context = context;
+            _contextFactory = contextFactory;
         }
 
+        // --- AddAsync ---
         public async Task<BlogPost> AddAsync(BlogPost entity)
         {
-            // EF Core automatically handles adding related BlogPostCategory entities
-            // if they are present in the entity.BlogPostCategories collection.
-            await _context.BlogPosts.AddAsync(entity);
-            await _context.SaveChangesAsync();
+            if (entity == null) throw new ArgumentNullException(nameof(entity));
+            await using var context = await _contextFactory.CreateDbContextAsync();
+            entity.BlogPostCategories ??= new List<BlogPostCategory>(); // Ensure collection exists
+            await context.BlogPosts.AddAsync(entity);
+            await context.SaveChangesAsync();
             return entity;
         }
+        // --------------
 
+        // --- DeleteAsync ---
         public async Task<bool> DeleteAsync(int id)
         {
-            var obj = await _context.BlogPosts.FirstOrDefaultAsync(x => x.ID == id);
+            await using var context = await _contextFactory.CreateDbContextAsync();
+            var obj = await context.BlogPosts.FirstOrDefaultAsync(x => x.ID == id);
             if (obj != null)
             {
-                _context.BlogPosts.Remove(obj); // Deletion cascades to BlogPostCategories if configured
-                return (await _context.SaveChangesAsync()) > 0;
+                context.BlogPosts.Remove(obj); // Deletion cascades should handle BlogPostCategories
+                return (await context.SaveChangesAsync()) > 0;
             }
             return false;
         }
+        // ---------------
 
+        // --- GetAllAsync ---
         public async Task<IEnumerable<BlogPost>> GetAllAsync()
         {
-            // Consider adding .Include(b => b.BlogPostCategories).ThenInclude(bc => bc.BlogCategory)
-            // here if you need to display categories on a blog post list page.
-            return await _context.BlogPosts.ToListAsync();
+            await using var context = await _contextFactory.CreateDbContextAsync();
+            // Include Categories/Author etc. here if needed for the list view
+            return await context.BlogPosts
+                                .OrderByDescending(p => p.PublishDate) // Example ordering
+                                .ToListAsync();
         }
+        // ---------------
 
-        // --- MODIFIED GetByIdAsync ---
+        // --- GetByIdAsync ---
         public async Task<BlogPost?> GetByIdAsync(int id)
         {
-            // Changed from FindAsync to FirstOrDefaultAsync to allow Include.
-            // Added .Include() to eagerly load the BlogPostCategories navigation property.
-            return await _context.BlogPosts
+            await using var context = await _contextFactory.CreateDbContextAsync();
+            return await context.BlogPosts
                                  .Include(b => b.BlogPostCategories) // Load the join table entries
-                                                                     // Optional: If you need the actual Category Name here too:
-                                                                     // .ThenInclude(bc => bc.BlogCategory)
-                                 .FirstOrDefaultAsync(b => b.ID == id); // Find by primary key
+                                                                     // Optional: .ThenInclude(bc => bc.BlogCategory) // Load actual category details
+                                 .FirstOrDefaultAsync(b => b.ID == id);
         }
-        // --- END MODIFICATION ---
+        // ----------------
 
+        // --- GetBySlugAsync ---
         public async Task<BlogPost?> GetBySlugAsync(string slug)
         {
-            // Consider adding .Include() here if you need categories on the single post display page.
-            return await _context.BlogPosts
-                                 // .Include(b => b.BlogPostCategories)
-                                 // .ThenInclude(bc => bc.BlogCategory)
+            if (string.IsNullOrWhiteSpace(slug)) return null;
+            await using var context = await _contextFactory.CreateDbContextAsync();
+            // Include Categories/Author etc. here if needed for the single post view
+            return await context.BlogPosts
+                                 .Include(b => b.BlogPostCategories) // Example include
+                                 .ThenInclude(bc => bc.BlogCategory)  // Example include
                                  .FirstOrDefaultAsync(x => x.Slug == slug);
         }
+        // ------------------
 
-        public async Task<BlogPost> UpdateAsync(BlogPost entity)
+        // --- SlugExistsAsync ---
+        public async Task<bool> SlugExistsAsync(int currentPostId, string slug)
         {
-            // EF Core's change tracker handles updates to the main entity
-            // AND changes made to the BlogPostCategories collection (adds/removes)
-            // because the entity was loaded with .Include() in GetByIdAsync.
-            _context.Entry(entity).State = EntityState.Modified; // Marks the main entity as modified
+            if (string.IsNullOrWhiteSpace(slug)) return false;
 
-            // You could explicitly mark BlogPostCategories as modified too, but often not needed
-            // if the collection itself was modified (items added/removed).
-            // Let EF Core handle the tracked changes.
+            await using var context = await _contextFactory.CreateDbContextAsync();
+            return await context.BlogPosts
+                                .Where(p => p.Slug == slug && p.ID != currentPostId)
+                                // Future: .Where(p => !p.IsDeleted)
+                                .AnyAsync();
+        }
+        // ---------------------
 
+        // --- UpdateAsync ---
+        public async Task<BlogPost> UpdateAsync(BlogPost entity, IEnumerable<int> selectedCategoryIds)
+        {
+            if (entity == null) throw new ArgumentNullException(nameof(entity));
+
+            selectedCategoryIds ??= Enumerable.Empty<int>(); // Ensure not null
+
+            await using var context = await _contextFactory.CreateDbContextAsync();
+
+            // 1. Attach the main entity and mark it as modified.
+            var attachedEntity = context.BlogPosts.Attach(entity);
+            attachedEntity.State = EntityState.Modified;
+
+            // 2. Get the current category IDs associated with this post *from the database*.
+            var existingCategoryIds = await context.BlogPostCategories
+                .Where(bc => bc.BlogPostId == entity.ID)
+                .Select(bc => bc.BlogCategoryId)
+                .ToListAsync();
+
+            // 3. Determine which categories to add.
+            var categoryIdsToAdd = selectedCategoryIds.Except(existingCategoryIds).ToList();
+            foreach (var categoryId in categoryIdsToAdd)
+            {
+                context.BlogPostCategories.Add(new BlogPostCategory { BlogPostId = entity.ID, BlogCategoryId = categoryId });
+            }
+
+            // 4. Determine which categories to remove.
+            var categoryIdsToRemove = existingCategoryIds.Except(selectedCategoryIds).ToList();
+            if (categoryIdsToRemove.Any())
+            {
+                var categoriesToRemove = await context.BlogPostCategories
+                    .Where(bc => bc.BlogPostId == entity.ID && categoryIdsToRemove.Contains(bc.BlogCategoryId))
+                    .ToListAsync();
+                context.BlogPostCategories.RemoveRange(categoriesToRemove);
+            }
+
+            // 5. Save changes.
             try
             {
-                await _context.SaveChangesAsync();
+                await context.SaveChangesAsync();
             }
             catch (DbUpdateConcurrencyException ex)
             {
-                // Handle concurrency issues - e.g., reload or notify user
                 Console.WriteLine($"Concurrency error updating blog post: {ex.Message}");
-                throw; // Rethrow for now, or handle more gracefully
+                // Handle concurrency if needed
+                throw;
             }
-            return entity;
+
+            return entity; // Return the original entity reference
         }
+        // -----------------
     }
 }
