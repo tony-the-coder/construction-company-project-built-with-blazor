@@ -112,10 +112,13 @@ namespace LehmanCustomConstruction.Data.Blogs.Repository
         }
         // --- END UPDATED DeleteAsync ---
 
-        // Optional: Implement SlugExistsAsync if needed for categories
-        // public async Task<bool> SlugExistsAsync(int currentCategoryId, string slug) { ... }
+        public async Task<BlogCategory?> GetBySlugAsync(string slug)
+        {
+            if (string.IsNullOrWhiteSpace(slug)) return null;
 
-        // Optional: Slug generation helper (could be moved to a shared utility class)
-        // private string GenerateSlug(string? phrase) { ... logic ... }
+            await using var context = await _contextFactory.CreateDbContextAsync();
+            return await context.BlogCategories
+                                 .FirstOrDefaultAsync(c => c.Slug == slug);
+        }
     }
 }

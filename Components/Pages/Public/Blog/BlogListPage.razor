@@ -1,0 +1,74 @@
+﻿@page "/blog" 
+@layout MainLayout 
+
+@using LehmanCustomConstruction.Data.Blogs
+@using LehmanCustomConstruction.Data.Blogs.Interfaces
+@inject IBlogPostRepository BlogPostRepository
+@inject NavigationManager NavigationManager
+
+<PageTitle>Lehman Custom Construction Blog</PageTitle>
+
+@* --- Page Header --- *@
+<div class="bg-gray-100 dark:bg-gray-800 py-12 mb-8">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+        <h1 class="text-3xl font-bold tracking-tight text-gray-900 dark:text-white sm:text-4xl">
+            Construction Insights & News
+        </h1>
+        <p class="mt-3 max-w-2xl mx-auto text-xl text-gray-500 dark:text-gray-400 sm:mt-4">
+            Stay updated with the latest projects, tips, and news from Lehman Custom Construction.
+        </p>
+    </div>
+</div>
+@* ----------------- *@
+
+
+<div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    @if (publishedPosts == null)
+    {
+        <p class="text-center text-gray-500 dark:text-gray-400"><em>Loading posts...</em></p>
+        @* TODO: Add a nicer loading spinner *@
+    }
+    else if (!publishedPosts.Any())
+    {
+        <p class="text-center text-gray-500 dark:text-gray-400"><em>No published blog posts found yet. Check back soon!</em></p>
+    }
+    else
+    {
+        @* Use a grid for the blog post cards (adjust columns as needed) *@
+        <div class="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
+            @foreach (var post in publishedPosts)
+            {
+                @* We'll create a separate BlogPostCard component for reusability *@
+                <BlogPostCard Post="post" />
+            }
+        </div>
+
+        @* TODO: Add Pagination controls here later *@
+    }
+</div>
+
+
+@code {
+    private IEnumerable<BlogPost>? publishedPosts;
+    private bool _isLoading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _isLoading = true;
+        try
+        {
+            // Fetch ONLY published posts using the modified repository method
+            publishedPosts = await BlogPostRepository.GetAllAsync(publishedOnly: true);
+        }
+        catch (Exception ex)
+        {
+             Console.WriteLine($"Error loading published blog posts: {ex.Message}");
+             // Optionally notify user or log centrally
+             publishedPosts = Enumerable.Empty<BlogPost>(); // Prevent null reference
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+}

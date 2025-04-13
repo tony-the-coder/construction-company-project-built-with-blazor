@@ -1,0 +1,105 @@
+﻿@page "/blog/{Slug}"
+@layout MainLayout
+
+@using LehmanCustomConstruction.Data.Blogs
+@using LehmanCustomConstruction.Data.Blogs.Interfaces
+@inject IBlogPostRepository BlogPostRepository
+@inject NavigationManager NavigationManager
+
+<PageTitle>@(_post?.Title ?? "Blog Post") | Lehman Custom Construction</PageTitle>
+
+@if (_isLoading)
+{
+    <p class="text-center text-gray-500 dark:text-gray-400 py-10"><em>Loading post...</em></p>
+}
+else if (_post == null)
+{
+    <div class="text-center py-10">
+         <h1 class="text-2xl font-semibold text-gray-700 dark:text-gray-300 mb-4">Post Not Found</h1>
+         <p class="text-gray-500 dark:text-gray-400">Sorry, the blog post you requested could not be found or is not published.</p>
+         <a href="/blog" class="mt-4 inline-block text-indigo-600 hover:text-indigo-800 dark:text-indigo-400 dark:hover:text-indigo-300">Return to Blog List</a>
+    </div>
+}
+else
+{
+    <article class="max-w-4xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
+        <header class="mb-6">
+             @* Optional: Featured Image at top *@
+             @if (!string.IsNullOrWhiteSpace(_post.ImageUrl))
+             {
+                 <img class="w-full h-auto max-h-96 object-cover rounded-lg shadow-md mb-6" src="@_post.ImageUrl" alt="@($"Featured image for {_post.Title}")" />
+             }
+
+            <h1 class="text-3xl font-bold tracking-tight text-gray-900 dark:text-white sm:text-4xl mb-3">
+                @_post.Title
+            </h1>
+            <div class="text-sm text-gray-500 dark:text-gray-400 flex items-center space-x-2">
+                <time datetime="@_post.PublishDate.ToString("yyyy-MM-dd")">
+                    Published on @(_post.PublishDate.ToString("MMMM d, yyyy"))
+                </time>
+                @if (!string.IsNullOrWhiteSpace(_post.Author))
+                {
+                    <span>by @_post.Author</span>
+                }
+                @if (_post.BlogPostCategories?.Any() == true)
+                {
+                    <span>| Categories:
+                        @foreach (var postCategory in _post.BlogPostCategories)
+                        {
+                            <a href="@($"/blog/category/{postCategory.BlogCategory?.Slug}")" class="ml-1 text-indigo-600 hover:underline dark:text-indigo-400">@postCategory.BlogCategory?.Name</a>@* Add comma? *@
+                        }
+                    </span>
+                }
+            </div>
+        </header>
+
+        @* Render the HTML content safely *@
+        <div class="prose prose-lg dark:prose-invert max-w-none"> @* Apply Tailwind Typography plugin styles *@
+            @((MarkupString)_post.Content)
+        </div>
+
+        @* Optional: Navigation back to list *@
+         <footer class="mt-8 pt-6 border-t border-gray-200 dark:border-gray-700">
+              <a href="/blog" class="text-indigo-600 hover:text-indigo-800 dark:text-indigo-400 dark:hover:text-indigo-300">← Back to Blog List</a>
+         </footer>
+    </article>
+}
+
+
+@code {
+    [Parameter]
+    public string? Slug { get; set; } // Parameter from the route
+
+    private BlogPost? _post;
+    private bool _isLoading = true;
+
+    protected override async Task OnParametersSetAsync() // Use this to react to parameter changes
+    {
+        if (!string.IsNullOrWhiteSpace(Slug))
+        {
+            _isLoading = true;
+            _post = null; // Clear previous post if slug changes
+            try
+            {
+                // Use the new repository method to get ONLY published posts
+                _post = await BlogPostRepository.GetPublishedPostBySlugAsync(Slug);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error loading published blog post by slug '{Slug}': {ex.Message}");
+                // Optionally notify user
+                _post = null;
+            }
+            finally
+            {
+                _isLoading = false;
+            }
+        }
+        else
+        {
+            // Handle case where slug is missing (optional redirect or error)
+            _isLoading = false;
+            _post = null;
+        }
+    }
+}

@@ -1,6 +1,12 @@
 ﻿// File Path: Data/Blogs/Repository/BlogPostRepository.cs
-using LehmanCustomConstruction.Data.Blogs.Interfaces;
-using Microsoft.EntityFrameworkCore;
+using LehmanCustomConstruction.Data; // Required for ApplicationDbContext
+using LehmanCustomConstruction.Data.Blogs; // Required for BlogPost, BlogCategory etc.
+using LehmanCustomConstruction.Data.Blogs.Interfaces; // Required for IBlogPostRepository
+using Microsoft.EntityFrameworkCore; // Required for EF Core methods, DbContextFactory
+using System; // Required for ArgumentNullException
+using System.Collections.Generic; // Required for IEnumerable, List
+using System.Linq; // Required for LINQ methods like Where, OrderByDescending etc.
+using System.Threading.Tasks; // Required for async Task
 
 namespace LehmanCustomConstruction.Data.Blogs.Repository
 {
@@ -39,40 +45,84 @@ namespace LehmanCustomConstruction.Data.Blogs.Repository
         }
         // ---------------
 
-        // --- GetAllAsync ---
-        public async Task<IEnumerable<BlogPost>> GetAllAsync()
+        // --- MODIFIED GetAllAsync ---
+        public async Task<IEnumerable<BlogPost>> GetAllAsync(bool publishedOnly = false) // Added parameter
         {
             await using var context = await _contextFactory.CreateDbContextAsync();
-            // Include Categories/Author etc. here if needed for the list view
-            return await context.BlogPosts
-                                .OrderByDescending(p => p.PublishDate) // Example ordering
-                                .ToListAsync();
-        }
-        // ---------------
+            var query = context.BlogPosts
+                               .Include(p => p.BlogPostCategories) // Include categories
+                               .ThenInclude(bpc => bpc.BlogCategory) // Include category details
+                               .AsQueryable();
 
-        // --- GetByIdAsync ---
+            if (publishedOnly)
+            {
+                query = query.Where(p => p.IsPublished); // Apply filter if requested
+            }
+
+            // Always order, most recent first
+            return await query.OrderByDescending(p => p.PublishDate)
+                              .ToListAsync();
+        }
+        // --- END MODIFICATION ---
+
+        // --- GetByIdAsync (For Admin Editing - includes drafts) ---
         public async Task<BlogPost?> GetByIdAsync(int id)
         {
             await using var context = await _contextFactory.CreateDbContextAsync();
             return await context.BlogPosts
                                  .Include(b => b.BlogPostCategories) // Load the join table entries
-                                                                     // Optional: .ThenInclude(bc => bc.BlogCategory) // Load actual category details
+                                 .ThenInclude(bpc => bpc.BlogCategory) // Load actual category details
                                  .FirstOrDefaultAsync(b => b.ID == id);
         }
-        // ----------------
+        // -----------------------------------------------------------
 
-        // --- GetBySlugAsync ---
+        // --- GetBySlugAsync (Generic - might include drafts) ---
         public async Task<BlogPost?> GetBySlugAsync(string slug)
         {
             if (string.IsNullOrWhiteSpace(slug)) return null;
             await using var context = await _contextFactory.CreateDbContextAsync();
-            // Include Categories/Author etc. here if needed for the single post view
             return await context.BlogPosts
                                  .Include(b => b.BlogPostCategories) // Example include
                                  .ThenInclude(bc => bc.BlogCategory)  // Example include
                                  .FirstOrDefaultAsync(x => x.Slug == slug);
         }
-        // ------------------
+        // -------------------------------------------------------
+
+        // --- ADDED GetPublishedPostBySlugAsync (For Public View) ---
+        public async Task<BlogPost?> GetPublishedPostBySlugAsync(string slug)
+        {
+            if (string.IsNullOrWhiteSpace(slug)) return null;
+            await using var context = await _contextFactory.CreateDbContextAsync();
+
+            // Include categories and ensure it's published
+            return await context.BlogPosts
+                                  .Where(p => p.Slug == slug && p.IsPublished) // Filter by slug AND published status
+                                  .Include(p => p.BlogPostCategories)
+                                  .ThenInclude(bpc => bpc.BlogCategory)
+                                  .FirstOrDefaultAsync();
+        }
+        // --- END ADDED METHOD ---
+
+        // <<< --- START: ADDED MISSING IMPLEMENTATION --- >>>
+        // --- GetPublishedPostsByCategorySlugAsync ---
+        public async Task<IEnumerable<BlogPost>> GetPublishedPostsByCategorySlugAsync(string categorySlug)
+        {
+            if (string.IsNullOrWhiteSpace(categorySlug))
+            {
+                return Enumerable.Empty<BlogPost>(); // Return empty if no slug provided
+            }
+
+            await using var context = await _contextFactory.CreateDbContextAsync();
+
+            return await context.BlogPosts
+                                 .Where(p => p.IsPublished && p.BlogPostCategories.Any(bpc => bpc.BlogCategory.Slug == categorySlug)) // Filter by published AND category slug
+                                 .Include(p => p.BlogPostCategories) // Include needed data for cards
+                                 .ThenInclude(bpc => bpc.BlogCategory)
+                                 .OrderByDescending(p => p.PublishDate) // Order results
+                                 .ToListAsync();
+        }
+        // --- END ADDED MISSING IMPLEMENTATION ---
+
 
         // --- SlugExistsAsync ---
         public async Task<bool> SlugExistsAsync(int currentPostId, string slug)
