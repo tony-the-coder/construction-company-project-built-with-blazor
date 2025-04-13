@@ -5976,6 +5976,10 @@
     --tw-leading: calc(var(--spacing) * 1);
     line-height: calc(var(--spacing) * 1);
   }
+  .leading-5 {
+    --tw-leading: calc(var(--spacing) * 5);
+    line-height: calc(var(--spacing) * 5);
+  }
   .leading-6 {
     --tw-leading: calc(var(--spacing) * 6);
     line-height: calc(var(--spacing) * 6);
@@ -6474,6 +6478,10 @@
     --tw-shadow: 0 1px 2px 0 var(--tw-shadow-color, rgb(0 0 0 / 0.05));
     box-shadow: var(--tw-inset-shadow), var(--tw-inset-ring-shadow), var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow);
   }
+  .shadow\/rounding {
+    --tw-shadow: 0 1px 3px 0 var(--tw-shadow-color, rgb(0 0 0 / 0.1)), 0 1px 2px -1px var(--tw-shadow-color, rgb(0 0 0 / 0.1));
+    box-shadow: var(--tw-inset-shadow), var(--tw-inset-ring-shadow), var(--tw-ring-offset-shadow), var(--tw-ring-shadow), var(--tw-shadow);
+  }
   .shadow-blue-500 {
     --tw-shadow-color: var(--color-blue-500);
   }
@@ -6741,6 +6749,13 @@
     &:hover {
       @media (hover: hover) {
         color: var(--color-gray-900);
+      }
+    }
+  }
+  .hover\:text-indigo-800 {
+    &:hover {
+      @media (hover: hover) {
+        color: var(--color-indigo-800);
       }
     }
   }
@@ -7097,6 +7112,11 @@
       background-color: color-mix(in oklab, var(--color-gray-900) 80%, transparent);
     }
   }
+  .dark\:bg-green-900 {
+    @media (prefers-color-scheme: dark) {
+      background-color: var(--color-green-900);
+    }
+  }
   .dark\:bg-indigo-500 {
     @media (prefers-color-scheme: dark) {
       background-color: var(--color-indigo-500);
@@ -7105,6 +7125,11 @@
   .dark\:bg-red-900 {
     @media (prefers-color-scheme: dark) {
       background-color: var(--color-red-900);
+    }
+  }
+  .dark\:bg-yellow-900 {
+    @media (prefers-color-scheme: dark) {
+      background-color: var(--color-yellow-900);
     }
   }
   .dark\:text-blue-500 {
@@ -7137,6 +7162,11 @@
       color: var(--color-gray-600);
     }
   }
+  .dark\:text-green-200 {
+    @media (prefers-color-scheme: dark) {
+      color: var(--color-green-200);
+    }
+  }
   .dark\:text-indigo-400 {
     @media (prefers-color-scheme: dark) {
       color: var(--color-indigo-400);
@@ -7150,6 +7180,11 @@
   .dark\:text-white {
     @media (prefers-color-scheme: dark) {
       color: var(--color-white);
+    }
+  }
+  .dark\:text-yellow-200 {
+    @media (prefers-color-scheme: dark) {
+      color: var(--color-yellow-200);
     }
   }
   .dark\:hover\:bg-blue-700 {
