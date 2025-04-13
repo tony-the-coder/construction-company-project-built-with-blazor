@@ -1,26 +1,44 @@
 ﻿@inherits LayoutComponentBase
+
+@* Assuming RadzenComponents includes Dialog, Notification etc. or add them individually *@
 <RadzenComponents @rendermode="InteractiveServer" />
+@* Or: *@
+@* <RadzenDialog /> *@
+@* <RadzenNotification /> *@
+@* <RadzenContextMenu /> *@
+@* <RadzenTooltip /> *@
 
-<NavBar />
+@* Apply flexbox and min-height to the main container div *@
+<div class="flex flex-col min-h-screen bg-stone-50 text-gray-800">  
+    @* Added classes here. Adjust bg/text colors as needed. *@
 
-<div class="page">
-     @* <div class="sidebar">  
-    <NavMenu /> 
-    </div> *@
+    @* 1. Header Area *@
+    <header>
+        @* Wrap NavBar in header for semantic HTML (optional but good practice) *@
+        <NavBar />
+    </header>
 
-    <main>
-        @* <div class="top-row px-4"> *@
-        @*     <a href="https://learn.microsoft.com/aspnet/core/" target="_blank">About</a> *@
-        @* </div> *@
-
+    @* 2. Main Content Area - Add flex-grow *@
+    <main class="flex-grow">
+        @* Added flex-grow here *@
+        @* Removed the inner 'page' div and simplified structure *@
+        @* The old 'article' is fine, or remove it if not needed for specific styling *@
         <article class="content px-4">
-            @Body
+            @* Keep px-4 for padding, adjust as needed *@
+            @Body @* Renders the actual page or nested layout *@
         </article>
     </main>
 
-    <Footer />
-</div>
+    @* 3. Footer Area *@
+    <footer>
+        @* Wrap Footer component semantically *@
+        <Footer />
+    </footer>
 
+</div> @* End of main flex container *@
+
+
+@* Keep the standard Blazor error UI *@
 <div id="blazor-error-ui" data-nosnippet>
     An unhandled error has occurred.
     <a href="." class="reload">Reload</a>

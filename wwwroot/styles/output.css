@@ -1921,6 +1921,9 @@
   .z-3 {
     z-index: 3;
   }
+  .z-5 {
+    z-index: 5;
+  }
   .z-10 {
     z-index: 10;
   }
@@ -2031,6 +2034,9 @@
   }
   .m-5 {
     margin: calc(var(--spacing) * 5);
+  }
+  .m-8 {
+    margin: calc(var(--spacing) * 8);
   }
   .m-361 {
     margin: calc(var(--spacing) * 361);
@@ -3119,6 +3125,9 @@
   }
   .h-36 {
     height: calc(var(--spacing) * 36);
+  }
+  .h-43 {
+    height: calc(var(--spacing) * 43);
   }
   .h-48 {
     height: calc(var(--spacing) * 48);
@@ -4965,6 +4974,9 @@
   .bg-slate-100 {
     background-color: var(--color-slate-100);
   }
+  .bg-stone-50 {
+    background-color: var(--color-stone-50);
+  }
   .bg-teal-50 {
     background-color: var(--color-teal-50);
   }
@@ -6671,6 +6683,9 @@
   .ease-out {
     --tw-ease: var(--ease-out);
     transition-timing-function: var(--ease-out);
+  }
+  .\[o\:Ɏ�cw3තU\16 \@-u\15 e\14 ���s�I\13 \] {
+    o: Ɏ�cw3තU@-ue���s�I;
   }
   .group-hover\:scale-105 {
     &:is(:where(.group):hover *) {
