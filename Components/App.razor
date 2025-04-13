@@ -5,19 +5,20 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <base href="/" />
-    <link rel="stylesheet" href="styles/output.css" /> @* Compiled Tailwind CSS *@
-    <link rel="stylesheet" href="LehmanCustomConstruction.styles.css" /> @* Blazor CSS isolation *@
+
     <link rel="icon" type="image/png" href="favicon.png" />
 
-    @* --- MODIFIED: Use RadzenTheme component for dark theme --- *@
-    <RadzenTheme Theme="material-dark" @rendermode="InteractiveServer" />
-    @* --- END MODIFICATION --- *@
-
-    <HeadOutlet @rendermode="InteractiveServer" /> 
+    @* --- NEW: Link Radzen Base CSS Manually --- *@
+    @* <<< CHECK THIS PATH/FILENAME for your Radzen version *@
+    @* --- END NEW --- *@
+    
+    <link rel="stylesheet" href="styles/output.css" /> @* Compiled Tailwind CSS (Loads AFTER Radzen base) *@
+    <link rel="stylesheet" href="LehmanCustomConstruction.styles.css" /> @* Blazor CSS isolation (Loads Last) *@
+    <HeadOutlet @rendermode="InteractiveServer" />
 </head>
 
 <body>
-    <Routes @rendermode="InteractiveServer" /> 
+    <Routes @rendermode="InteractiveServer" />
 
     <script src="https://cdn.jsdelivr.net/npm/flowbite@3.1.2/dist/flowbite.min.js"></script> @* Keep Flowbite JS *@
     <script src="_framework/blazor.web.js"></script> @* Keep Blazor JS *@
@@ -25,3 +26,4 @@
 </body>
 
 </html>
+

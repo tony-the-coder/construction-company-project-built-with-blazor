@@ -1,6 +1,33 @@
+/* Import Google Fonts (Place this at the very top) */
+@import url('https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600;700&family=Playfair+Display:wght@700;900&display=swap');
+
+/* Tailwind v4 Core Imports */
 @import "tailwindcss";
+
+/* Define Tailwind Configuration File Path */
 @config "./../../tailwind.config.js";
+
+
+/* Flowbite Imports (Keep these as they were) */
 @import "flowbite/src/themes/default";
 @import "flowbite";
 @plugin "flowbite/plugin";
-@source "../../node_modules/flowbite";
+@source "../../node_modules/flowbite"; // Make sure this path is correct relative to your CSS file
+/* Define Custom Base Styles */
+@layer base {
+    body
+
+{
+    /* Apply default background, text color, and body font */
+    @apply bg-background text-primary font-sans;
+}
+
+/* Optional: Apply default heading font */
+h1, h2, h3, h4, h5, h6 {
+    @apply font-serif; /* Applies Playfair Display */
+}
+
+/* Add any other global base styles here if needed */
+}
+
+/* You can add custom component styles or utilities in other layers (@layer components, @layer utilities) */
