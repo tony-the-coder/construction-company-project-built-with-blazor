@@ -1,62 +1,58 @@
 ﻿@using LehmanCustomConstruction.Data.Blogs
 
-@* --- Updated Card Styling --- *@
-@* Use bg-white for contrast or remove it to inherit bg-background. Use subtle border/shadow. *@
-<article class="flex flex-col rounded-lg shadow-md overflow-hidden bg-white border border-subtle h-full">
-    @* Changed shadow-lg to shadow-md, changed border color, kept bg-white *@
-    <a href="@($"/blog/{Post?.Slug}")" aria-label="@($"Read more about {Post?.Title}")">
-        @if (!string.IsNullOrWhiteSpace(Post?.ImageUrl))
-        {
-            @* Kept image styling, consider aspect-ratio later if needed *@
-            <img class="h-48 w-full object-cover" src="@Post.ImageUrl" alt="@($"Featured image for {Post.Title}")">
-        }
-        else
-        {
-            @* Use subtle background for placeholder, update text color *@
-            <div class="h-48 w-full bg-gray-100 flex items-center justify-center">
-                @* Changed gradient to bg-gray-100 *@
-                <span class="text-secondary text-sm">(No Image)</span> @* Use secondary text color *@
-            </div>
-        }
-    </a>
-    <div class="flex-1 p-6 flex flex-col justify-between">
-        <div class="flex-1">
-            @* Display Categories - Use Accent Color for links *@
-            @if (Post?.BlogPostCategories?.Any() == true)
+<article class="flex flex-col rounded-lg overflow-hidden bg-white border border-subtle h-full transition duration-300 ease-in-out hover:border-gray-300 shadow-none">
+    <a href="@($"/blog/{Post?.Slug}")" class="group flex flex-col flex-grow" aria-label="@($"Read more about {Post?.Title}")">
+        <div class="aspect-video overflow-hidden">
+            @if (!string.IsNullOrWhiteSpace(Post?.ImageUrl))
             {
-                <div class="text-sm font-medium text-accent mb-1 space-x-1">
-                    @* Changed indigo to accent *@
-                    @foreach (var postCategory in Post.BlogPostCategories)
-                    {
-                        <a href="@($"/blog/category/{postCategory.BlogCategory?.Slug}")" class="hover:underline">@postCategory.BlogCategory?.Name</a>
-                        @* Add comma logic if more than one category? *@
-                    }
+                <img class="w-full h-full object-cover transition-transform duration-300 ease-in-out group-hover:scale-105"
+                     src="@Post.ImageUrl"
+                     loading="lazy"
+                     alt="@($"Featured image for {Post.Title}")">
+            }
+            else
+            {
+                <div class="w-full h-full bg-gray-100 flex items-center justify-center p-4">
+                    <img class="max-h-[60%] max-w-[70%] object-contain opacity-50"
+                         src="/images/Using-this-logo-during-dev.jpg"
+                         alt="Lehman Custom Construction - Default Blog Image">
                 </div>
             }
-            <a href="@($"/blog/{Post?.Slug}")" class="block mt-2">
-                @* Title: Use Primary Text Color, Serif Font. Accent color on hover. *@
-                <p class="text-xl font-semibold text-primary hover:text-accent transition duration-150 ease-in-out font-serif">@Post?.Title</p>
-                @* Excerpt: Use Secondary Text Color, Sans Font. *@
+        </div>
+
+        <div class="flex-1 p-6 flex flex-col justify-between">
+            <div class="flex-1 mb-4">
+                @if (Post?.BlogPostCategories?.Any() == true)
+                {
+                    <div class="text-xs font-medium text-accent uppercase tracking-wider mb-2 font-sans">
+                        @string.Join(" / ", Post.BlogPostCategories.Select(pc => pc.BlogCategory?.Name))
+                    </div>
+                }
+                <p class="text-xl font-semibold text-primary group-hover:text-accent transition duration-150 ease-in-out font-serif">
+                    @Post?.Title
+                </p>
                 <p class="mt-3 text-base text-secondary line-clamp-3 font-sans">
                     @Post?.Excerpt
                 </p>
-            </a>
-        </div>
-        <div class="mt-6 flex items-center">
-            @* Meta Info: Use Secondary Text Color *@
-            <div class="flex space-x-1 text-sm text-secondary font-sans">
-                <time datetime="@Post?.PublishDate.ToString("yyyy-MM-dd")">@Post?.PublishDate.ToString("MMMM d, yyyy")</time>
-                @if (!string.IsNullOrWhiteSpace(Post?.Author))
-                {
-                    <span aria-hidden="true">·</span>
-                    <span>@Post.Author</span>
-                }
+            </div>
+            <div class="mt-auto flex items-center justify-between">
+                <div class="flex items-center space-x-1 text-sm text-secondary font-sans">
+                    <time datetime="@Post?.PublishDate.ToString("yyyy-MM-dd")">@Post?.PublishDate.ToString("MMMM d, yyyy")</time>
+                    @if (!string.IsNullOrWhiteSpace(Post?.Author))
+                    {
+                        <span aria-hidden="true">·</span>
+                        <span>@Post.Author</span>
+                    }
+                </div>
+                <span class="text-accent opacity-0 group-hover:opacity-100 transition-opacity duration-300 ease-in-out" aria-hidden="true">
+                    <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" d="M10.293 3.293a1 1 0 011.414 0l6 6a1 1 0 010 1.414l-6 6a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-4.293-4.293a1 1 0 010-1.414z" clip-rule="evenodd"></path></svg>
+                </span>
             </div>
         </div>
-    </div>
+    </a>
 </article>
 
 @code {
     [Parameter, EditorRequired]
-    public BlogPost? Post { get; set; }
+    public BlogPost? Post { get; set; } = default!;
 }

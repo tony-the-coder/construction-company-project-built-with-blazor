@@ -8,22 +8,32 @@
 
     <link rel="icon" type="image/png" href="favicon.png" />
 
-    @* --- NEW: Link Radzen Base CSS Manually --- *@
-    @* <<< CHECK THIS PATH/FILENAME for your Radzen version *@
-    @* --- END NEW --- *@
-    
-    <link rel="stylesheet" href="styles/output.css" /> @* Compiled Tailwind CSS (Loads AFTER Radzen base) *@
-    <link rel="stylesheet" href="LehmanCustomConstruction.styles.css" /> @* Blazor CSS isolation (Loads Last) *@
+    @* Keep RadzenTheme component commented out - we load base CSS manually *@
+    @* <RadzenTheme Theme="material" @rendermode="InteractiveServer" /> *@
+
+    @* --- CORRECTED CSS ORDER --- *@
+
+    @* 1. MANUALLY Load Radzen BASE CSS for component structure *@
+    @*    This provides essential styles for Radzen components WITHOUT the full theme colors. *@
+    @*    Choose ONE base theme below (material-base is common). Check path is correct. *@
+    <link rel="stylesheet" href="_content/Radzen.Blazor/css/material-base.css" />
+
+    @* 2. Load Compiled Tailwind CSS (handles overall theme) *@
+    <link rel="stylesheet" href="styles/output.css" />
+
+    @* 3. Load Blazor CSS isolation (loads last) *@
+    <link rel="stylesheet" href="LehmanCustomConstruction.styles.css" />
+
     <HeadOutlet @rendermode="InteractiveServer" />
 </head>
 
 <body>
     <Routes @rendermode="InteractiveServer" />
 
-    <script src="https://cdn.jsdelivr.net/npm/flowbite@3.1.2/dist/flowbite.min.js"></script> @* Keep Flowbite JS *@
-    <script src="_framework/blazor.web.js"></script> @* Keep Blazor JS *@
-    <script src="_content/Radzen.Blazor/Radzen.Blazor.js?v=@(typeof(Radzen.Colors).Assembly.GetName().Version)"></script> @* Keep Radzen JS *@
+    @* --- JS Includes --- *@
+    <script src="https://cdn.jsdelivr.net/npm/flowbite@3.1.2/dist/flowbite.min.js"></script>
+    <script src="_framework/blazor.web.js"></script>
+    <script src="_content/Radzen.Blazor/Radzen.Blazor.js?v=@(typeof(Radzen.Colors).Assembly.GetName().Version)"></script>
 </body>
 
 </html>
-
