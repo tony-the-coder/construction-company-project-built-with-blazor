@@ -38,7 +38,7 @@ else
                     class="min-w-full shadow rounded-lg overflow-hidden">
         <Columns>
             @* ID Column (Read-only) *@
-         
+
 
             @* Name Column (Editable) *@
             <RadzenDataGridColumn TItem="BlogCategory" Property="Name" Title="Name">
@@ -63,7 +63,7 @@ else
                     <RadzenButton Icon="edit" ButtonStyle="ButtonStyle.Light" Variant="Variant.Flat" Size="ButtonSize.Small" Click="@(args => EditRow(category))" @onclick:stopPropagation="true" Disabled="@(_categoryToInsert != null)" />
                     <RadzenButton Icon="delete" ButtonStyle="ButtonStyle.Danger" Variant="Variant.Flat" Shade="Shade.Lighter" Size="ButtonSize.Small" Class="my-1 ms-1" Click="@(args => DeleteRow(category))" @onclick:stopPropagation="true" Disabled="@(_categoryToInsert != null || _categoryToEdit != null)" />
                 </Template>
-                 <EditTemplate Context="category">
+                <EditTemplate Context="category">
                     <RadzenButton Icon="save" ButtonStyle="ButtonStyle.Success" Variant="Variant.Flat" Size="ButtonSize.Small" Click="@((args) => SaveRow(category))" />
                     <RadzenButton Icon="cancel" ButtonStyle="ButtonStyle.Light" Variant="Variant.Flat" Size="ButtonSize.Small" Class="my-1 ms-1" Click="@((args) => CancelEdit(category))" />
                 </EditTemplate>
@@ -123,11 +123,11 @@ else
         // Generate/Format Slug based on Name before validating/saving
         category.Slug = GenerateSlug(category.Name); // Always generate from Name for consistency
 
-         // Basic required field checks
+        // Basic required field checks
         if (string.IsNullOrWhiteSpace(category.Name) || string.IsNullOrWhiteSpace(category.Slug))
         {
-             NotificationService.Notify(NotificationSeverity.Warning, "Validation Error", "Name is required (Slug is generated automatically).");
-             return; // Prevent saving
+            NotificationService.Notify(NotificationSeverity.Warning, "Validation Error", "Name is required (Slug is generated automatically).");
+            return; // Prevent saving
         }
 
         // TODO: Add Slug Uniqueness Check for categories if slugs must be unique across categories
@@ -136,18 +136,18 @@ else
 
         await _grid!.UpdateRow(category); // Triggers OnUpdateRow or OnCreateRow
 
-         _categoryToEdit = null;
-         _originalCategoryBeforeEdit = null;
-         _categoryToInsert = null;
+        _categoryToEdit = null;
+        _originalCategoryBeforeEdit = null;
+        _categoryToInsert = null;
     }
 
     private async Task OnUpdateRow(BlogCategory category)
     {
         if (_originalCategoryBeforeEdit == null || _categoryToEdit == null || _categoryToEdit.ID != category.ID)
         {
-             NotificationService.Notify(NotificationSeverity.Warning, "Save Error", "Cannot save row, edit state mismatch.");
-             CancelEdit(category);
-             return;
+            NotificationService.Notify(NotificationSeverity.Warning, "Save Error", "Cannot save row, edit state mismatch.");
+            CancelEdit(category);
+            return;
         }
 
         _isLoading = true;
@@ -163,33 +163,34 @@ else
             category.Name = _originalCategoryBeforeEdit.Name;
             category.Slug = _originalCategoryBeforeEdit.Slug;
         }
-        finally {
+        finally
+        {
             _isLoading = false;
-             _categoryToEdit = null;
-             _originalCategoryBeforeEdit = null;
+            _categoryToEdit = null;
+            _originalCategoryBeforeEdit = null;
         }
     }
 
     private async Task OnCreateRow(BlogCategory category)
     {
         _isLoading = true;
-         try
-         {
-             // Slug should have been generated in SaveRow
-             await CategoryRepository.AddAsync(category);
-             NotificationService.Notify(NotificationSeverity.Success, "Success", "Category added successfully.");
-             await LoadCategories(); // Reload includes the new category
-         }
-         catch (Exception ex)
-         {
-             NotificationService.Notify(NotificationSeverity.Error, "Create Error", $"Failed to add category: {ex.Message}");
-             await LoadCategories(); // Reload to ensure clean state
-         }
-         finally
-         {
+        try
+        {
+            // Slug should have been generated in SaveRow
+            await CategoryRepository.AddAsync(category);
+            NotificationService.Notify(NotificationSeverity.Success, "Success", "Category added successfully.");
+            await LoadCategories(); // Reload includes the new category
+        }
+        catch (Exception ex)
+        {
+            NotificationService.Notify(NotificationSeverity.Error, "Create Error", $"Failed to add category: {ex.Message}");
+            await LoadCategories(); // Reload to ensure clean state
+        }
+        finally
+        {
             _isLoading = false;
             _categoryToInsert = null;
-         }
+        }
     }
 
     private void CancelEdit(BlogCategory category)
@@ -227,16 +228,17 @@ else
                 }
                 else
                 {
-                     NotificationService.Notify(NotificationSeverity.Warning, "Deletion Failed", "Category could not be deleted (possibly associated with posts).");
+                    NotificationService.Notify(NotificationSeverity.Warning, "Deletion Failed", "Category could not be deleted (possibly associated with posts).");
                 }
             }
-            catch(Exception ex)
+            catch (Exception ex)
             {
-                 NotificationService.Notify(NotificationSeverity.Error, "Deletion Error", $"Error deleting category: {ex.Message}");
+                NotificationService.Notify(NotificationSeverity.Error, "Deletion Error", $"Error deleting category: {ex.Message}");
             }
-            finally{
+            finally
+            {
                 _isLoading = false;
-                 StateHasChanged();
+                StateHasChanged();
             }
         }
     }
@@ -255,8 +257,8 @@ else
         return str;
     }
 
-     private void OnRowSelect(BlogCategory category)
-     {
-         Console.WriteLine($"Row Selected: {category.Name}");
-     }
+    private void OnRowSelect(BlogCategory category)
+    {
+        Console.WriteLine($"Row Selected: {category.Name}");
+    }
 }
