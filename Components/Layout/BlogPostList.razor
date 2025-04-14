@@ -1,58 +1,158 @@
-﻿@using LehmanCustomConstruction.Data.Blogs
+﻿@page "/admin/blog" 
+@layout AdminLayout 
 
-<article class="flex flex-col rounded-lg overflow-hidden bg-white border border-subtle h-full transition duration-300 ease-in-out hover:border-gray-300 shadow-none">
-    <a href="@($"/blog/{Post?.Slug}")" class="group flex flex-col flex-grow" aria-label="@($"Read more about {Post?.Title}")">
-        <div class="aspect-video overflow-hidden">
-            @if (!string.IsNullOrWhiteSpace(Post?.ImageUrl))
-            {
-                <img class="w-full h-full object-cover transition-transform duration-300 ease-in-out group-hover:scale-105"
-                     src="@Post.ImageUrl"
-                     loading="lazy"
-                     alt="@($"Featured image for {Post.Title}")">
-            }
-            else
-            {
-                <div class="w-full h-full bg-gray-100 flex items-center justify-center p-4">
-                    <img class="max-h-[60%] max-w-[70%] object-contain opacity-50"
-                         src="/images/Using-this-logo-during-dev.jpg"
-                         alt="Lehman Custom Construction - Default Blog Image">
-                </div>
-            }
-        </div>
+@using LehmanCustomConstruction.Data.Blogs
+@using LehmanCustomConstruction.Data.Blogs.Interfaces
+@using Radzen 
 
-        <div class="flex-1 p-6 flex flex-col justify-between">
-            <div class="flex-1 mb-4">
-                @if (Post?.BlogPostCategories?.Any() == true)
-                {
-                    <div class="text-xs font-medium text-accent uppercase tracking-wider mb-2 font-sans">
-                        @string.Join(" / ", Post.BlogPostCategories.Select(pc => pc.BlogCategory?.Name))
-                    </div>
-                }
-                <p class="text-xl font-semibold text-primary group-hover:text-accent transition duration-150 ease-in-out font-serif">
-                    @Post?.Title
-                </p>
-                <p class="mt-3 text-base text-secondary line-clamp-3 font-sans">
-                    @Post?.Excerpt
-                </p>
-            </div>
-            <div class="mt-auto flex items-center justify-between">
-                <div class="flex items-center space-x-1 text-sm text-secondary font-sans">
-                    <time datetime="@Post?.PublishDate.ToString("yyyy-MM-dd")">@Post?.PublishDate.ToString("MMMM d, yyyy")</time>
-                    @if (!string.IsNullOrWhiteSpace(Post?.Author))
-                    {
-                        <span aria-hidden="true">·</span>
-                        <span>@Post.Author</span>
-                    }
-                </div>
-                <span class="text-accent opacity-0 group-hover:opacity-100 transition-opacity duration-300 ease-in-out" aria-hidden="true">
-                    <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" d="M10.293 3.293a1 1 0 011.414 0l6 6a1 1 0 010 1.414l-6 6a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-4.293-4.293a1 1 0 010-1.414z" clip-rule="evenodd"></path></svg>
-                </span>
-            </div>
-        </div>
+@inject IBlogPostRepository BlogPostRepository
+@inject NavigationManager NavigationManager
+@inject Radzen.DialogService DialogService
+@inject Radzen.NotificationService NotificationService 
+
+<h3 class="text-2xl font-semibold text-primary dark:text-gray-100 mb-6 font-serif">Manage Blog Posts</h3>
+
+<div class="mb-6">
+    <a href="/admin/blog/edit" 
+       class="inline-flex items-center px-4 py-2 bg-accent border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2 dark:focus:ring-offset-gray-800 transition ease-in-out duration-150">
+        Create New Post
     </a>
-</article>
+</div>
+
+@if (_isLoading && blogPosts == null) @* Show loading only on initial load *@
+{
+    <p class="text-secondary dark:text-gray-400"><em>Loading posts...</em></p>
+}
+else if (blogPosts == null || !blogPosts.Any())
+{
+    <p class="text-secondary dark:text-gray-400"><em>No blog posts found. <a href="/admin/blog/edit" class="text-accent hover:underline">Create one!</a></em></p>
+}
+else
+{
+    <div class="shadow overflow-hidden border border-subtle dark:border-gray-700 sm:rounded-lg"> 
+        <table class="min-w-full divide-y divide-subtle dark:divide-gray-700">
+            <thead class="bg-gray-50 dark:bg-gray-800"> 
+                <tr>
+                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-secondary uppercase tracking-wider dark:text-gray-400">
+                        Title
+                    </th>
+                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-secondary uppercase tracking-wider dark:text-gray-400">
+                        Author
+                    </th>
+                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-secondary uppercase tracking-wider dark:text-gray-400">
+                        Published Date
+                    </th>
+                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-secondary uppercase tracking-wider dark:text-gray-400">
+                        Status
+                    </th>
+                    <th scope="col" class="relative px-6 py-3">
+                        <span class="sr-only">Actions</span>
+                    </th>
+                </tr>
+            </thead>
+            <tbody class="bg-white divide-y divide-subtle dark:bg-gray-900 dark:divide-gray-700">
+                @foreach (var post in blogPosts)
+                {
+                    <tr>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-primary dark:text-white">
+                            @post.Title
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-secondary dark:text-gray-400">
+                            @post.Author
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-secondary dark:text-gray-400">
+                            @post.PublishDate.ToString("yyyy-MM-dd") 
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm">
+                            @if (post.IsPublished)
+                            {
+                                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
+                                    Published
+                                </span>
+                            }
+                            else
+                            {
+                                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200">
+                                    Draft
+                                </span>
+                            }
+                        </td>
+                        <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-3"> 
+                            <a href="@($"/admin/blog/edit/{post.ID}")" class="text-accent hover:underline dark:text-accent">Edit</a>
+                            <button type="button" @onclick="() => ConfirmDelete(post)" class="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300">Delete</button> 
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
 
 @code {
-    [Parameter, EditorRequired]
-    public BlogPost? Post { get; set; } = default!;
+    private IEnumerable<BlogPost>? blogPosts;
+    private bool _isLoading = true; 
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadPosts();
+    }
+
+    private async Task LoadPosts()
+    {
+        _isLoading = true; 
+        try
+        {
+            blogPosts = (await BlogPostRepository.GetAllAsync()).ToList(); 
+        }
+        catch (Exception ex)
+        {
+             NotificationService.Notify(NotificationSeverity.Error, "Load Error", $"Failed to load blog posts: {ex.Message}");
+             blogPosts = Enumerable.Empty<BlogPost>(); 
+        }
+        finally
+        {
+             _isLoading = false; 
+             // StateHasChanged needed if LoadPosts is called outside of lifecycle methods (like after delete)
+             // Not strictly necessary here, but doesn't hurt.
+             StateHasChanged(); 
+        }
+    }
+
+    private async Task ConfirmDelete(BlogPost postToDelete)
+    {
+        var confirmed = await DialogService.Confirm(
+            $"Are you sure you want to delete the post '{postToDelete.Title}'?",
+            "Confirm Deletion",
+            new ConfirmOptions { OkButtonText = "Yes", CancelButtonText = "No" }
+        );
+
+        if (confirmed == true)
+        {
+            _isLoading = true; 
+            StateHasChanged();
+            bool deleted = false;
+            try
+            {
+                deleted = await BlogPostRepository.DeleteAsync(postToDelete.ID);
+                if (deleted)
+                {
+                    NotificationService.Notify(NotificationSeverity.Success, "Success", "Post deleted successfully.");
+                    await LoadPosts(); // Refresh the list
+                }
+                else
+                {
+                    NotificationService.Notify(NotificationSeverity.Warning, "Deletion Failed", $"Could not delete post '{postToDelete.Title}'.");
+                }
+            }
+            catch (Exception ex)
+            {
+                NotificationService.Notify(NotificationSeverity.Error, "Deletion Error", $"Error deleting post: {ex.Message}");
+            }
+            finally
+            {
+                _isLoading = false;
+                StateHasChanged(); // Ensure UI updates after delete attempt
+            }
+        }
+    }
 }
