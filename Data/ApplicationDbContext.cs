@@ -1,6 +1,6 @@
 // File: Data/ApplicationDbContext.cs
 using LehmanCustomConstruction.Data.Blogs;
-using LehmanCustomConstruction.Data.Common; // Ensure this namespace is correct for PageContent
+using LehmanCustomConstruction.Data.Common; // Namespace for PageContent and ContactInquiry
 // using LehmanCustomConstruction.Data.Portfolio; // Add later when needed
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
@@ -17,6 +17,9 @@ namespace LehmanCustomConstruction.Data // Adjust namespace if needed
 
         // --- Page Content DbSet ---
         public DbSet<PageContent> PageContents { get; set; } = null!;
+
+        // --- ADDED: Contact Inquiry DbSet ---
+        public DbSet<ContactInquiry> ContactInquiries { get; set; } = null!;
 
         // --- Portfolio DbSets (Add later) ---
         // public DbSet<PortfolioProject> PortfolioProjects { get; set; } = null!;
@@ -48,6 +51,20 @@ namespace LehmanCustomConstruction.Data // Adjust namespace if needed
                       .HasForeignKey(bc => bc.BlogCategoryId);
             });
 
+            // --- ADDED: Configure ContactInquiry ---
+            builder.Entity<ContactInquiry>(entity =>
+            {
+                // Define how the enum is stored (as a string is common)
+                entity.Property(e => e.Status)
+                      .HasConversion<string>()
+                      .HasMaxLength(50); // Max length for the enum string
+
+                // Other configurations if needed (e.g., indexes)
+                // entity.HasIndex(e => e.SubmittedDate);
+                // entity.HasIndex(e => e.Status);
+            });
+
+
             // --- Configure Portfolio Relationships (Add later) ---
             // ...
 
@@ -66,7 +83,6 @@ namespace LehmanCustomConstruction.Data // Adjust namespace if needed
                 {
                     PageKey = "AboutUsMain",
                     HtmlContent = @"<p>Lehman Custom Construction is built on a foundation of quality, integrity, and partnership. Founded by Tom Lehman, our passion lies in translating your vision into a home that is both uniquely yours and built to the highest standards of craftsmanship.</p><p>We believe the custom home building process should be collaborative and transparent. From initial concept sketches to the final walkthrough, we work closely with you, ensuring every detail reflects your lifestyle and preferences.</p><h2>Our Approach</h2><p>Our approach combines time-honored building techniques with modern innovations. We partner with skilled architects, designers, and tradespeople who share our commitment to excellence. Key elements include:</p><ul><li><strong>Personalized Design:</strong> Tailoring every aspect to your needs.</li><li><strong>Quality Materials:</strong> Sourcing durable and beautiful materials.</li><li><strong>Transparent Communication:</strong> Keeping you informed every step of the way.</li><li><strong>Expert Project Management:</strong> Ensuring timelines and budgets are respected.</li></ul><p>Building a custom home is a significant journey, and we are honored to be considered as your guide and partner.</p>",
-                    // --- FIXED DATE --- Use a specific, consistent date to avoid migration warnings
                     DateModified = new DateTime(2024, 1, 1, 0, 0, 0, DateTimeKind.Utc)
                 }
             );

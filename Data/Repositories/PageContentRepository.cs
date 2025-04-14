@@ -1,59 +1,66 @@
 ﻿// File: Data/Repositories/PageContentRepository.cs
 using LehmanCustomConstruction.Data.Common;
 using LehmanCustomConstruction.Data.Interfaces;
-using Microsoft.EntityFrameworkCore; // Required for DbContext and async methods
+using Microsoft.EntityFrameworkCore;
+using System; // Required for DateTime
+using System.Threading.Tasks; // Required for Task
 
-namespace LehmanCustomConstruction.Data.Repositories // Adjust namespace if needed
+namespace LehmanCustomConstruction.Data.Repositories
 {
     public class PageContentRepository : IPageContentRepository
     {
-        private readonly ApplicationDbContext _context;
+        // --- Inject the FACTORY ---
+        private readonly IDbContextFactory<ApplicationDbContext> _contextFactory;
 
-        // Inject the DbContext
-        public PageContentRepository(ApplicationDbContext context)
+        public PageContentRepository(IDbContextFactory<ApplicationDbContext> contextFactory)
         {
-            _context = context;
+            _contextFactory = contextFactory;
         }
+        // --- End Factory Injection ---
 
         public async Task<string?> GetContentAsync(string pageKey)
         {
-            var content = await _context.PageContents
-                                        .AsNoTracking() // Good practice for read-only data
-                                        .FirstOrDefaultAsync(p => p.PageKey == pageKey);
+            // Create context instance within method scope
+            using var context = _contextFactory.CreateDbContext();
+            var content = await context.PageContents
+                                       .AsNoTracking()
+                                       .FirstOrDefaultAsync(p => p.PageKey == pageKey);
             return content?.HtmlContent;
         }
 
         public async Task<PageContent?> GetPageContentAsync(string pageKey)
         {
-            return await _context.PageContents
-                                 .AsNoTracking()
-                                 .FirstOrDefaultAsync(p => p.PageKey == pageKey);
+            // Create context instance within method scope
+            using var context = _contextFactory.CreateDbContext();
+            return await context.PageContents
+                                .AsNoTracking()
+                                .FirstOrDefaultAsync(p => p.PageKey == pageKey);
         }
 
         public async Task SaveContentAsync(string pageKey, string htmlContent)
         {
-            var existingContent = await _context.PageContents.FindAsync(pageKey);
+            // Create context instance within method scope
+            using var context = _contextFactory.CreateDbContext();
+            var existingContent = await context.PageContents.FindAsync(pageKey);
 
             if (existingContent != null)
             {
-                // Update existing content
                 existingContent.HtmlContent = htmlContent;
                 existingContent.DateModified = DateTime.UtcNow;
-                _context.PageContents.Update(existingContent);
+                context.PageContents.Update(existingContent);
             }
             else
             {
-                // Create new content
                 var newContent = new PageContent
                 {
                     PageKey = pageKey,
                     HtmlContent = htmlContent,
                     DateModified = DateTime.UtcNow
                 };
-                await _context.PageContents.AddAsync(newContent);
+                await context.PageContents.AddAsync(newContent);
             }
 
-            await _context.SaveChangesAsync(); // Save changes to the database
+            await context.SaveChangesAsync();
         }
     }
 }
