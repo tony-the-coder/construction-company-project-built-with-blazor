@@ -1,11 +1,11 @@
 ﻿@page "/contact"
 @layout MainLayout
 @using System.ComponentModel.DataAnnotations
-@using LehmanCustomConstruction.Data.Common // For ContactInquiry
-@using LehmanCustomConstruction.Data.Interfaces // For IContactInquiryRepository
+@using LehmanCustomConstruction.Data.Common
+@using LehmanCustomConstruction.Data.Interfaces 
 @inject IContactInquiryRepository ContactRepository
-@inject NavigationManager NavManager // To potentially redirect after submit
-@inject Radzen.NotificationService NotificationService // For success/error messages
+@inject NavigationManager NavManager 
+@inject Radzen.NotificationService NotificationService 
 
 <PageTitle>Contact Us | Lehman Custom Construction</PageTitle>
 
@@ -28,13 +28,11 @@
     <div class="max-w-7xl mx-auto py-16 px-4 sm:px-6 lg:px-8">
         <div class="grid grid-cols-1 md:grid-cols-2 gap-16">
 
-            @* --- Left Side: Contact Info --- *@
+            @* --- Left Side: Contact Info (Replace Placeholders) --- *@
             <div class="text-primary font-sans">
                 <h2 class="text-2xl font-semibold font-serif mb-4">Contact Information</h2>
                 <p class="text-secondary mb-6">Reach out to us directly or visit our office.</p>
-
                 <div class="space-y-4">
-                    @* TODO: Replace placeholders with actual contact details *@
                     <p class="flex items-start">
                         <svg class="flex-shrink-0 h-6 w-6 text-accent mr-3 mt-1" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z" /><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z" /></svg>
                         <span>
@@ -44,11 +42,11 @@
                     </p>
                     <p class="flex items-center">
                         <svg class="flex-shrink-0 h-6 w-6 text-accent mr-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 6.75c0 8.284 6.716 15 15 15h2.25a2.25 2.25 0 002.25-2.25v-1.372c0-.516-.351-.966-.852-1.091l-4.423-1.106c-.44-.11-.902.055-1.173.417l-.97 1.293c-.282.376-.769.542-1.21.38a12.035 12.035 0 01-7.143-7.143c-.162-.441.004-.928.38-1.21l1.293-.97c.363-.271.527-.734.417-1.173L6.963 3.102a1.125 1.125 0 00-1.091-.852H4.5A2.25 2.25 0 002.25 4.5v2.25z" /></svg>
-                        <a href="tel:+18285551212" class="text-secondary hover:text-accent">(828) 555-1212</a> @* Example Phone *@
+                        <a href="tel:+18285551212" class="text-secondary hover:text-accent">(828) 555-1212</a>
                     </p>
                     <p class="flex items-center">
                         <svg class="flex-shrink-0 h-6 w-6 text-accent mr-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" /></svg>
-                        <a href="mailto:info@lehmancustomconstruction.com" class="text-secondary hover:text-accent">info@lehmancustomconstruction.com</a> @* Example Email *@
+                        <a href="mailto:info@lehmancustomconstruction.com" class="text-secondary hover:text-accent">info@lehmancustomconstruction.com</a>
                     </p>
                 </div>
             </div>
@@ -65,7 +63,6 @@
                 {
                     <EditForm Model="_contactModel" OnValidSubmit="HandleValidSubmitAsync">
                         <DataAnnotationsValidator />
-                        @* <ValidationSummary class="text-red-600 mb-4" /> *@ @* Optional overall summary *@
 
                         <div class="space-y-5">
                             <div>
@@ -83,6 +80,7 @@
                             <div>
                                 <label for="phone" class="block text-sm font-medium text-primary">Phone Number <span class="text-secondary text-xs">(Optional)</span></label>
                                 <InputText id="phone" @bind-Value="_contactModel.Phone" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-accent focus:ring-accent sm:text-sm bg-white text-primary placeholder-gray-400" />
+                                @* Use ValidationMessage for phone regex error *@
                                 <ValidationMessage For="@(() => _contactModel.Phone)" class="text-red-600 text-xs mt-1" />
                             </div>
 
@@ -131,58 +129,54 @@
         [EmailAddress(ErrorMessage = "Please enter a valid email address.")]
         public string Email { get; set; } = string.Empty;
 
-        [StringLength(30)]
-        [Phone(ErrorMessage = "Please enter a valid phone number.")] // Basic phone validation
-        public string? Phone { get; set; }
+        [StringLength(30, ErrorMessage = "Phone number is too long.")]
+        // --- UPDATED PHONE VALIDATION ---
+        [RegularExpression(@"^[\d\s()-]+$", ErrorMessage = "Please enter a valid phone number using digits, spaces, hyphens, or parentheses.")]
+        public string? Phone { get; set; } // Remains nullable (optional)
 
         [StringLength(150)]
         public string? Subject { get; set; }
 
         [Required(ErrorMessage = "Please enter your message.")]
-        [StringLength(5000, ErrorMessage = "Message is too long.")] // Max length
+        [StringLength(5000, ErrorMessage = "Message is too long.")]
         public string Message { get; set; } = string.Empty;
     }
 
     private async Task HandleValidSubmitAsync()
     {
         _isSubmitting = true;
-        formSubmittedSuccessfully = false; // Reset success state
-        StateHasChanged(); // Update UI to show submitting state
+        formSubmittedSuccessfully = false;
+        StateHasChanged();
 
         try
         {
-            // 1. Map Form Model to Data Entity
             var inquiry = new ContactInquiry
                 {
                     Name = _contactModel.Name,
                     Email = _contactModel.Email,
-                    Phone = _contactModel.Phone,
+                    Phone = _contactModel.Phone, // Pass validated phone number
                     Subject = _contactModel.Subject,
                     Message = _contactModel.Message,
-                    SubmittedDate = DateTime.UtcNow, // Set date here
-                    Status = InquiryStatus.New       // Set status here
+                    SubmittedDate = DateTime.UtcNow,
+                    Status = InquiryStatus.New
                 };
 
-            // 2. Save to Database
             await ContactRepository.AddAsync(inquiry);
 
-            // 3. TODO: Send Emails (Customer Confirmation & Admin Notification)
-            //    We will add this logic in the next step using an IEmailService
+            // TODO: Send Emails (Next Step)
 
-            // 4. Show Success Message & Reset Form
             formSubmittedSuccessfully = true;
-            _contactModel = new(); // Clear the form fields
+            _contactModel = new();
         }
         catch (Exception ex)
         {
             Console.WriteLine($"Error submitting contact form: {ex.Message}");
-            // Use Radzen Notification Service for errors
             NotificationService.Notify(NotificationSeverity.Error, "Submission Error", "There was a problem sending your message. Please try again later.", 7000);
         }
         finally
         {
             _isSubmitting = false;
-            StateHasChanged(); // Update UI to remove submitting state / show success message
+            StateHasChanged();
         }
     }
 }
