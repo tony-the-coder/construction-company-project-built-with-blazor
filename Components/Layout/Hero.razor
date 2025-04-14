@@ -1,30 +1,47 @@
-﻿<div class="w-screen h-screen overflow-hidden relative before:block before:absolute before:bg-black before:h-full before:w-full before:top-0 before:left-0 before:z-10 before:opacity-30">
-    <img src="@ImageUrl" class="absolute top-0 left-0 min-h-full ob" alt=""> @* <-- Needs object-cover? class="ob"? *@
-    <div class="relative z-20 max-w-screen-lg mx-auto grid grid-cols-12 h-full items-center">
-        <div class="col-span-6">
-            <span class="uppercase text-white text-xs font-bold mb-2 block">@Title</span>
-            <h1 class="text-white font-extrabold text-5xl mb-8">@Subtitle</h1>
-            <p class="text-stone-100 text-base">
+﻿@* File: Components/Layout/Hero.razor (or Components/Public/Shared/Hero.razor) *@
+
+<div class="relative w-full min-h-[80vh] overflow-hidden before:block before:absolute before:bg-black before:h-full before:w-full before:top-0 before:left-0 before:z-10 before:opacity-40">
+
+    <img src="@ImageUrl"
+         class="absolute inset-0 w-full h-full object-cover"
+         alt="Luxury custom home exterior or interior background">
+
+    <div class="relative z-20 max-w-screen-lg mx-auto h-full flex items-center px-4 sm:px-6 lg:px-8">
+
+        <div class="w-full max-w-3xl mx-auto text-center">
+
+            <span class="uppercase text-accent dark:text-accent text-sm font-semibold mb-3 block tracking-wider font-sans">
+                @Title
+            </span>
+
+            <h1 class="text-background font-extrabold text-4xl sm:text-5xl lg:text-6xl mb-6 font-serif leading-tight">
+                @Subtitle
+            </h1>
+
+            <p class="text-gray-200 dark:text-gray-300 text-lg sm:text-xl font-sans">
                 @Description
             </p>
-            <button href="@ButtonLink" class="mt-8 text-white uppercase py-4 text-base font-light px-10 border border-white hover:bg-white hover:bg-opacity-10">@ButtonText</button>
+
+            <a href="@ButtonLink"
+               class="mt-8 inline-block uppercase py-3 px-8 text-base font-medium tracking-wider border border-background text-background transition duration-150 ease-in-out hover:bg-background hover:text-primary focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-primary focus:ring-background rounded-md">
+                @ButtonText
+            </a>
         </div>
     </div>
 </div>
 
 @code {
     [Parameter]
-    public string? Title { get; set; } = "Lehman Custom Construction";
+    public string? Title { get; set; } = "Luxury Custom Homes";
     [Parameter]
-    public string? Subtitle { get; set; } = "We are experts in construction and renovation";
+    public string? Subtitle { get; set; } = "Building Your Vision With Unrivaled Craftsmanship";
     [Parameter]
-    public string? Description { get; set; } = "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.";
+    public string? Description { get; set; } = "Experience the difference of a truly custom home, meticulously built to reflect your lifestyle by Lehman Custom Construction.";
     [Parameter]
-    public string? ImageUrl { get; set; } = "https://picsum.photos/seed/picsum/1900/850";
+    // **** CHANGED DEFAULT TO LOCAL PATH ****
+    public string? ImageUrl { get; set; } = "/images/hero-image.jpg";
     [Parameter]
-    public string? ButtonText { get; set; } = "Get started";
+    public string? ButtonText { get; set; } = "Explore Our Work";
     [Parameter]
-    public string? ButtonLink { get; set; } = "#";
-    
-
+    public string? ButtonLink { get; set; } = "/portfolio";
 }

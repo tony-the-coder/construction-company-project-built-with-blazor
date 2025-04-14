@@ -1,43 +1,39 @@
-﻿<section class="bg-white dark:bg-gray-900 py-16 sm:py-24">
-    @* Adjust background and padding *@
+﻿@* File: Components/Public/Shared/ValuePropositionSection.razor *@
+
+@* Use bg-white or bg-gray-50 for section background contrast, add border top *@
+<section class="bg-white py-16 sm:py-24 border-t border-subtle">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
 
-        @* Optional Section Heading *@
+        @* Section Heading - Apply theme colors/fonts *@
         <div class="text-center mb-12 sm:mb-16">
-            <h2 class="text-base font-semibold text-indigo-600 dark:text-indigo-400 tracking-wide uppercase">Why Choose Us</h2>
-            <p class="mt-2 text-3xl font-extrabold text-gray-900 dark:text-white tracking-tight sm:text-4xl">
+            <h2 class="text-base font-semibold text-accent tracking-wide uppercase font-sans">Why Choose Us</h2>
+            <p class="mt-2 text-3xl font-bold text-primary tracking-tight sm:text-4xl font-serif">
                 The Lehman Difference
             </p>
-            <p class="mt-4 max-w-2xl mx-auto text-xl text-gray-500 dark:text-gray-400">
+            <p class="mt-4 max-w-2xl mx-auto text-xl text-secondary font-sans">
                 Building trust and exceptional homes, one project at a time.
             </p>
         </div>
 
-        @* Grid for Value Cards - Adjust columns (e.g., lg:grid-cols-3) and gap as needed *@
+        @* Grid for Value Cards - Ensure ValueCard component itself is themed correctly *@
         <div class="grid grid-cols-1 gap-y-12 gap-x-8 md:grid-cols-2 lg:grid-cols-3">
 
             @* --- CARD 1: Quality --- *@
-            <ValueCard IconSvgPath="M12 1.75l-6.75 4.167v8.166C5.25 18.305 8.22 22 12 22s6.75-3.695 6.75-7.917V5.917L12 1.75zm0 2.166l4.5 2.777v6.39c0 2.89-2.025 5.817-4.5 5.817s-4.5-2.927-4.5-5.817V6.693l4.5-2.777zM11.25 14.5l4.5-4.5-1.06-1.06-3.44 3.44-1.94-1.94-1.06 1.06l3 3z" 
-
+            @* Ensure ValueCard component uses themed styles (bg-accent icon, text-primary title, etc.) *@
+            <ValueCard IconSvgPath="M12 1.75l-6.75 4.167v8.166C5.25 18.305 8.22 22 12 22s6.75-3.695 6.75-7.917V5.917L12 1.75zm0 2.166l4.5 2.777v6.39c0 2.89-2.025 5.817-4.5 5.817s-4.5-2.927-4.5-5.817V6.693l4.5-2.777zM11.25 14.5l4.5-4.5-1.06-1.06-3.44 3.44-1.94-1.94-1.06 1.06l3 3z"
                        Title="Uncompromising Quality"
                        Description="From foundation to finishing touches, we use only the finest materials and techniques to ensure your home is built to last for generations."
-                       ButtonText="Our Building Process" 
-                       
-                       ButtonLink="/our-process" />      @* Optional Link *@
+                       @* Removed button props for this example - add back if needed *@ />
 
             @* --- CARD 2: Custom Design --- *@
-            <ValueCard IconSvgPath="M19.5 12.75l-7.5-7.5-7.5 7.5m15 4.5l-7.5 7.5-7.5-7.5" 
+            <ValueCard IconSvgPath="M19.5 12.75l-7.5-7.5-7.5 7.5m15 4.5l-7.5 7.5-7.5-7.5"
                        Title="Truly Custom Design"
-                       Description="We work closely with you and renowned architects to translate your unique vision into a functional, beautiful, and personalized living space."
-                       ButtonText="Explore Floor Plans" 
-                       ButtonLink="/floor-plans" />      @* Optional Link *@
+                       Description="We work closely with you and renowned architects to translate your unique vision into a functional, beautiful, and personalized living space." />
 
             @* --- CARD 3: Communication/Transparency --- *@
-            <ValueCard IconSvgPath="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" 
+            <ValueCard IconSvgPath="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"
                        Title="Transparent Partnership"
-                       Description="Experience clear communication, detailed planning, and a collaborative approach throughout your entire custom home building journey."/>
-
-            @* Add more ValueCard components as needed *@
+                       Description="Experience clear communication, detailed planning, and a collaborative approach throughout your entire custom home building journey." />
 
         </div>
     </div>

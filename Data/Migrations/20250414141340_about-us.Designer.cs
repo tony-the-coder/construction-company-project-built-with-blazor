@@ -4,6 +4,7 @@ using LehmanCustomConstruction.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace LehmanCustomConstruction.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    partial class ApplicationDbContextModelSnapshot : ModelSnapshot
+    [Migration("20250414141340_about-us")]
+    partial class aboutus
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -206,7 +209,7 @@ namespace LehmanCustomConstruction.Migrations
                         new
                         {
                             PageKey = "AboutUsMain",
-                            DateModified = new DateTime(2024, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            DateModified = new DateTime(2025, 4, 14, 14, 13, 38, 906, DateTimeKind.Utc).AddTicks(6632),
                             HtmlContent = "<p>Lehman Custom Construction is built on a foundation of quality, integrity, and partnership. Founded by Tom Lehman, our passion lies in translating your vision into a home that is both uniquely yours and built to the highest standards of craftsmanship.</p><p>We believe the custom home building process should be collaborative and transparent. From initial concept sketches to the final walkthrough, we work closely with you, ensuring every detail reflects your lifestyle and preferences.</p><h2>Our Approach</h2><p>Our approach combines time-honored building techniques with modern innovations. We partner with skilled architects, designers, and tradespeople who share our commitment to excellence. Key elements include:</p><ul><li><strong>Personalized Design:</strong> Tailoring every aspect to your needs.</li><li><strong>Quality Materials:</strong> Sourcing durable and beautiful materials.</li><li><strong>Transparent Communication:</strong> Keeping you informed every step of the way.</li><li><strong>Expert Project Management:</strong> Ensuring timelines and budgets are respected.</li></ul><p>Building a custom home is a significant journey, and we are honored to be considered as your guide and partner.</p>"
                         });
                 });

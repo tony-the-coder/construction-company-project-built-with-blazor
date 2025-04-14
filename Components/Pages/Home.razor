@@ -1,42 +1,26 @@
-﻿@page "/"
+﻿@* File: Components/Pages/Public/Home/Home.razor *@
+@page "/"
+@layout MainLayout
 
-<PageTitle>Lehman Custom Construction</PageTitle>
+<PageTitle>Lehman Custom Construction | Luxury Home Builder</PageTitle>
 
 
 <Hero />
-<CallToActionBanner CTATitle="Ready to build your dream home?"
-                    CTASubtitle="Contact us for a consultation and let's discuss your vision"
-                    CTAButtonText="Get In Touch"
-                    CTAButtonLink="#" />
-@* <ImageOnLeft AboveImageHeading="Uncompromising Quality" *@
-@*              ImageHeading="Craftsmanship That Endures" *@
-@*              ImageText="From foundation to finishing touches, we use only the finest materials and techniques to ensure your home is built to last for generations." *@
-@*              ImageUrl="https://picsum.photos/800/600?grayscale&blur=2" *@
-@*              ButtonText="Our Building Process" *@
-@*              ButtonLink="/process" /> *@
 
-@* <ImageOnRight AboveImageHeading="Your Vision, Our Expertise" *@
-@*               ImageHeading="Truly Custom Design" *@
-@*               ImageText="We work closely with you and renowned architects to translate your unique vision into a functional, beautiful, and personalized living space." *@
-@*               ImageUrl="https://picsum.photos/800/600?grayscale&blur=2" *@
-@*               ButtonText="Explore Floor Plans" *@
-@*               ButtonLink="/floorplans" /> *@
+@* === Updated CallToActionBanner Parameters === *@
+<CallToActionBanner CTATitle="Begin Your Custom Home Journey"
+                    CTASubtitle="Discuss your vision with our expert team and explore the possibilities for your dream home."
+                    CTAButtonText="Schedule Consultation"
+                    CTAButtonLink="/contact" /> @* Direct link to the Contact page *@
 
-@* <ImageOnLeft AboveImageHeading="Uncompromising Quality" *@
-@*              ImageHeading="Craftsmanship That Endures" *@
-@*              ImageText="From foundation to finishing touches, we use only the finest materials and techniques to ensure your home is built to last for generations." *@
-@*              ImageUrl="https://picsum.photos/800/600?grayscale&blur=2" *@
-@*              ButtonText="Our Building Process" *@
-@*              ButtonLink="/process" /> *@
-
+@* ValuePropositionSection should contain the "Why Choose Us" and ValueCards *@
 <ValuePropositionSection />
 
-
-@* <ImageLinkGrid /> *@
-
+@* Testimonial Carousel *@
 <TestimonialCarouselFlowbite />
 
 
-@code {
 
+@code {
+    // Code behind for the Home page if needed
 } 

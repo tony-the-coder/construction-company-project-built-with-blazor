@@ -22,6 +22,7 @@
     <Folder Include="Components\Forms\" />
     <Folder Include="Components\UI\" />
     <Folder Include="Components\Portfolio\" />
+    <Folder Include="Data\Portfolio\" />
     <Folder Include="dead-ideas\" />
     <Folder Include="wwwroot\images\logos\" />
   </ItemGroup>

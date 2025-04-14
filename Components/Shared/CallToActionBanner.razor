@@ -1,37 +1,58 @@
-﻿@inject NavigationManager NavManager
+﻿@* File: Components/Shared/CallToActionBanner.razor *@
+@inject NavigationManager NavManager
 
+@* Use a subtle theme background, add borders for definition *@
+<div class="bg-gray-50 dark:bg-gray-800 py-16 sm:py-20 border-y border-subtle dark:border-gray-700">
+    @* Added border-y, adjusted padding *@
+    <div class="max-w-screen-lg mx-auto px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row justify-between items-center gap-8 text-center md:text-left">
+        @* Added padding, responsive layout, text alignment *@
 
-<div class="bg-[#f7d0b6] py-20">
-    @* <--Change this background color later *@
-    <div class="max-w-screen-lg mx-auto flex justify-between items-center">
         <div class="max-w-xl">
-            <h2 class="font-black text-sky-950 text-3xl mb-4">@CTATitle</h2> @* <-- Placeholder Title *@
-            <p class="text-base text-sky-950">@CTASubtitle</p> @* <-- Placeholder Subtitle *@
+            @* Apply theme colors and fonts *@
+            <h2 class="text-3xl font-bold text-primary dark:text-white font-serif mb-3 sm:text-4xl">
+                @CTATitle
+            </h2>
+            <p class="text-lg text-secondary dark:text-gray-300 font-sans">
+                @CTASubtitle
+            </p>
         </div>
-        <RadzenButton Shade="Shade.Lighter"
-                      Click="@NavigateToLink"
-                      Text="@CTAButtonText"
-                      ButtonStyle="ButtonStyle.Primary" />
+
+        @* Use a themed Tailwind button for better consistency *@
+        <div class="flex-shrink-0 mt-6 md:mt-0">
+            @* Added flex-shrink-0 and margin for spacing *@
+            <a href="@CTAButtonLink" @onclick:preventDefault="@(CTAButtonLink == "#")" @onclick="NavigateToLink"
+               class="inline-flex items-center justify-center rounded-md border border-transparent bg-accent px-6 py-3 text-base font-medium text-white shadow-sm hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2 dark:focus:ring-offset-gray-800 transition ease-in-out duration-150">
+                @CTAButtonText
+            </a>
+        </div>
+        @* 
+           // --- Radzen Button Option  ---
+           <div class="flex-shrink-0 mt-6 md:mt-0">
+               <RadzenButton Shade="Shade.Darker" 
+                             Click="@NavigateToLink"
+                             Text="@CTAButtonText"
+                             ButtonStyle="ButtonStyle.Primary" 
+                             class="bg-accent hover:opacity-90 text-white px-6 py-3" /> 
+           </div>
+        *@
     </div>
 </div>
 
 @code {
-
     [Parameter]
-    public string? CTATitle { get; set; } = "Default Title"; 
+    public string? CTATitle { get; set; } = "Ready to Start Your Project?"; // Updated Default
     [Parameter]
-    public string? CTASubtitle { get; set; } = "Default Subtitle";
+    public string? CTASubtitle { get; set; } = "Let's discuss how we can bring your vision to life."; // Updated Default
     [Parameter]
-    public string CTAButtonText { get; set; } = "Default Button Text";
+    public string CTAButtonText { get; set; } = "Get In Touch"; // Updated Default
     [Parameter]
-    public string CTAButtonLink { get; set; } = "#";
+    public string CTAButtonLink { get; set; } = "/contact"; // Updated Default
 
     private void NavigateToLink()
     {
-        if (!string.IsNullOrEmpty(CTAButtonLink))
+        if (!string.IsNullOrWhiteSpace(CTAButtonLink) && CTAButtonLink != "#")
         {
             NavManager.NavigateTo(CTAButtonLink);
         }
     }
 }
-
