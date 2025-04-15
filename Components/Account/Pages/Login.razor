@@ -86,10 +86,40 @@
     //     }
     // }
 
+
+    protected override void OnInitialized()
+    {
+        // --- ADDED LOG ---
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] Login.razor: OnInitialized START");
+        base.OnInitialized();
+        // --- ADDED LOG ---
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] Login.razor: OnInitialized END");
+    }
+
+    protected override void OnParametersSet()
+    {
+        // --- ADDED LOG ---
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] Login.razor: OnParametersSet START");
+        base.OnParametersSet();
+        // --- ADDED LOG ---
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] Login.razor: OnParametersSet END");
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        // --- ADDED LOG ---
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] Login.razor: OnAfterRenderAsync (First Render: {firstRender}) START");
+        await base.OnAfterRenderAsync(firstRender);
+        // --- ADDED LOG ---
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] Login.razor: OnAfterRenderAsync (First Render: {firstRender}) END");
+    }
+
     public async Task LoginUser()
     {
         // This doesn't count login failures towards account lockout
         // To enable password failures to trigger account lockout, set lockoutOnFailure: true
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] Login.razor: LoginUser attempting login for {Input.Email}");
+        errorMessage = null; // Clear previous errors
         var result = await SignInManager.PasswordSignInAsync(Input.Email, Input.Password, Input.RememberMe, lockoutOnFailure: false);
         if (result.Succeeded)
         {
@@ -111,6 +141,8 @@
         {
             errorMessage = "Error: Invalid login attempt.";
         }
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] Login.razor: LoginUser finished attempt for {Input.Email}. Succeeded: {result.Succeeded}");
+        StateHasChanged();
     }
 
     private sealed class InputModel
