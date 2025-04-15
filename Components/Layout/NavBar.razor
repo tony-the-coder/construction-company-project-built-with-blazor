@@ -1,33 +1,83 @@
-﻿@inject NavigationManager NavigationManager
+﻿@* File: Components/Shared/NavBar.razor *@
+@using LehmanCustomConstruction.Components.Layout @* Needed for LoginDisplay *@
+@inject NavigationManager NavigationManager
 
+@* Apply theme background (or make transparent), padding, etc. *@
+@* Let's use a subtle background initially, can be changed in MainLayout's header tag if needed *@
+<nav class="bg-white border-b border-subtle shadow-sm" aria-label="Global">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        @* Constrain width *@
+        <div class="flex h-16 items-center justify-between">
+            @* Standard height *@
 
-<nav class="flex items-center justify-between p-6 lg:px-8" aria-label="Global">
-    <div class="flex lg:flex-1">
-        <a href="#" class="-m-1.5 p-1.5">
-            <span class="sr-only">Lehman Custom Construction</span>
-            @* <img class="h-8 w-auto" src="https://tailwindcss.com/plus-assets/img/logos/mark.svg?color=indigo&shade=600" alt=""> *@
-            <img class="h-15 w-auto" src="/images/Using-this-logo-during-dev.jpg" alt="">
-        </a>
+            @* Left Side: Logo *@
+            <div class="flex items-center">
+                <div class="flex-shrink-0">
+                    <a href="/" aria-label="Lehman Custom Construction Home">
+                        @* Use primary logo version on light background *@
+                        <img class="block h-10 w-auto" src="/images/Using-this-logo-during-dev.jpg" alt="Lehman Custom Construction Logo">
+                    </a>
+                </div>
+            </div>
+
+            @* Center: Main Navigation Links (Desktop) *@
+            <div class="hidden sm:ml-6 sm:flex sm:space-x-8">
+                @* Use theme colors, sans font, add active link styling if desired later *@
+                <a href="/about-us"
+                   class="inline-flex items-center border-b-2 border-transparent px-1 pt-1 text-sm font-medium text-primary hover:border-gray-300 hover:text-secondary">
+                    About Us
+                </a>
+                <a href="/blog"
+                   class="inline-flex items-center border-b-2 border-transparent px-1 pt-1 text-sm font-medium text-primary hover:border-gray-300 hover:text-secondary">
+                    Blog
+                </a>
+                <a href="/contact"
+                   class="inline-flex items-center border-b-2 border-transparent px-1 pt-1 text-sm font-medium text-primary hover:border-gray-300 hover:text-secondary">
+                    Contact
+                </a>
+                @* Add other links like Portfolio later *@
+            </div>
+
+            @* Right Side: Login/User Status (Desktop) *@
+            <div class="hidden sm:ml-6 sm:flex sm:items-center">
+                <LoginDisplay /> @* <<< INTEGRATED HERE <<< *@
+            </div>
+
+            @* Mobile Menu Button (Functionality not implemented here) *@
+            <div class="-mr-2 flex items-center sm:hidden">
+                <button type="button" class="relative inline-flex items-center justify-center rounded-md bg-white p-2 text-primary hover:bg-gray-100 hover:text-secondary focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2" aria-controls="mobile-menu" aria-expanded="false">
+                    <span class="absolute -inset-0.5"></span>
+                    <span class="sr-only">Open main menu</span>
+                    @* Icon when menu is closed - Heroicon menu *@
+                    <svg class="block h-6 w-6" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" /></svg>
+                    @* Icon when menu is open - Heroicon x-mark *@
+                    @* <svg class="hidden h-6 w-6" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg> *@
+                </button>
+            </div>
+
+        </div>
     </div>
-    <div class="flex lg:hidden">
-        <button type="button" class="-m-2.5 inline-flex items-center justify-center rounded-md p-2.5 text-gray-700">
-            <span class="sr-only">Open main menu</span>
-            <svg class="size-6" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true" data-slot="icon">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
-            </svg>
-        </button>
-    </div>
-    <div class="hidden lg:flex lg:gap-x-12">
-        <a href="#" class="text-sm/6 font-semibold text-gray-900">Our Work</a>
-        <a href="#" class="text-sm/6 font-semibold text-gray-900">What we do</a>
-        <a href="#" class="text-sm/6 font-semibold text-gray-900">Who we are</a>
-        <a href="#" class="text-sm/6 font-semibold text-gray-900">Placeholder</a>
-        <a href="#" class="text-sm/6 font-semibold text-gray-900">And Another Placeholder</a>
-    </div>
-    <div class="hidden lg:flex lg:flex-1 lg:justify-end">
-        @* <a href="#" class="text-sm/6 font-semibold text-gray-900">Log in <span aria-hidden="true">&rarr;</span></a> *@
+
+    @* Mobile Menu (Hidden by default, needs JS/Blazor logic to toggle) *@
+    <div class="sm:hidden hidden" id="mobile-menu">
+        @* Add 'hidden' class initially *@
+        <div class="space-y-1 px-2 pb-3 pt-2">
+            <a href="/about-us" class="block rounded-md px-3 py-2 text-base font-medium text-primary hover:bg-gray-100 hover:text-secondary">About Us</a>
+            <a href="/blog" class="block rounded-md px-3 py-2 text-base font-medium text-primary hover:bg-gray-100 hover:text-secondary">Blog</a>
+            <a href="/contact" class="block rounded-md px-3 py-2 text-base font-medium text-primary hover:bg-gray-100 hover:text-secondary">Contact</a>
+        </div>
+        @* Mobile Login Display Separately? *@
+        <div class="border-t border-subtle px-4 py-3">
+            <LoginDisplay />
+        </div>
     </div>
 </nav>
+
+
 @code {
-    public string logoUrl = "//wwwroot/images/logos/Using-this-logo-during-dev.jpg";
+    // Code for NavBar component if needed (e.g., mobile menu toggle logic)
+    // Example (needs more implementation):
+    // private bool isMobileMenuOpen = false;
+    // private void ToggleMobileMenu() => isMobileMenuOpen = !isMobileMenuOpen;
+    // private string MobileMenuCssClass => isMobileMenuOpen ? "" : "hidden";
 }

@@ -90,31 +90,35 @@ else
 
 @code {
     private IEnumerable<BlogPost>? blogPosts;
-    private bool _isLoading = true; 
+    private bool _isLoading = true;
 
     protected override async Task OnInitializedAsync()
     {
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] BlogPostList OnInitializedAsync STARTING"); // <<< ADD LOG
         await LoadPosts();
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] BlogPostList OnInitializedAsync FINISHED"); // <<< ADD LOG
     }
 
     private async Task LoadPosts()
     {
-        _isLoading = true; 
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] LoadPosts START"); // <<< ADD LOG
+        _isLoading = true;
         try
         {
-            blogPosts = (await BlogPostRepository.GetAllAsync()).ToList(); 
+            blogPosts = (await BlogPostRepository.GetAllAsync()).ToList();
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] LoadPosts SUCCESS - Loaded {blogPosts?.Count() ?? 0} posts."); // <<< ADD LOG
         }
         catch (Exception ex)
         {
-             NotificationService.Notify(NotificationSeverity.Error, "Load Error", $"Failed to load blog posts: {ex.Message}");
-             blogPosts = Enumerable.Empty<BlogPost>(); 
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] LoadPosts ERROR: {ex.Message}"); // <<< ADD LOG
+            NotificationService.Notify(NotificationSeverity.Error, "Load Error", $"Failed to load blog posts: {ex.Message}");
+            blogPosts = Enumerable.Empty<BlogPost>();
         }
         finally
         {
-             _isLoading = false; 
-             // StateHasChanged needed if LoadPosts is called outside of lifecycle methods (like after delete)
-             // Not strictly necessary here, but doesn't hurt.
-             StateHasChanged(); 
+            _isLoading = false;
+            StateHasChanged();
+            Console.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] LoadPosts FINISHED"); // <<< ADD LOG
         }
     }
 

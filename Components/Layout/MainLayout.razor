@@ -1,46 +1,61 @@
-﻿@inherits LayoutComponentBase
+﻿@* File: Components/Layout/MainLayout.razor *@
+@inherits LayoutComponentBase
+@using LehmanCustomConstruction.Components.Layout @* << ADDED: Needed for LoginDisplay *@
+@using LehmanCustomConstruction.Components.Shared @* << ADDED: Assuming NavBar and Footer are here *@
 
-@* Assuming RadzenComponents includes Dialog, Notification etc. or add them individually *@
+@* Radzen Components needed globally (Dialogs, Notifications, etc.) *@
 <RadzenComponents @rendermode="InteractiveServer" />
-@* Or: *@
-@* <RadzenDialog /> *@
-@* <RadzenNotification /> *@
-@* <RadzenContextMenu /> *@
-@* <RadzenTooltip /> *@
 
-@* Apply flexbox and min-height to the main container div *@
-<div class="flex flex-col min-h-screen bg-stone-50 text-gray-800">  
-    @* Added classes here. Adjust bg/text colors as needed. *@
+@* Main container: Full height, flex column, theme background/text/font *@
+<div class="flex flex-col min-h-screen bg-background text-primary font-sans">
 
     @* 1. Header Area *@
-    <header>
-        @* Wrap NavBar in header for semantic HTML (optional but good practice) *@
-        <NavBar />
+    <header class="sticky top-0 z-40 w-full">
+        @* Example: Make header sticky *@
+        @* Assume NavBar handles its internal structure and styling *@
+        @* Pass LoginDisplay as a parameter or render it within NavBar if possible *@
+        <NavBar>
+            @* Example: Render LoginDisplay in a specific slot if NavBar supports it 
+             <LoginSlot>
+                 <LoginDisplay />
+             </LoginSlot>
+             *@
+        </NavBar>
+
+        @* --- OR --- If NavBar doesn't handle it, place LoginDisplay structurally here: *@
+        @* Example: Simple placement in top-right (adjust positioning/styling as needed) *@
+        @* <div class="absolute top-0 right-0 p-4 z-50"> 
+             <LoginDisplay />
+           </div> 
+        *@
+        @* === YOU NEED TO INTEGRATE <LoginDisplay /> into your actual <NavBar> structure === *@
+
     </header>
 
-    @* 2. Main Content Area - Add flex-grow *@
+    @* 2. Main Content Area - Grows to fill available space *@
     <main class="flex-grow">
-        @* Added flex-grow here *@
-        @* Removed the inner 'page' div and simplified structure *@
-        @* The old 'article' is fine, or remove it if not needed for specific styling *@
-        <article class="content px-4">
-            @* Keep px-4 for padding, adjust as needed *@
-            @Body @* Renders the actual page or nested layout *@
-        </article>
+        @* Let the specific page/component define its own padding and structure *@
+        @Body
     </main>
+
+   
 
     @* 3. Footer Area *@
     <footer>
-        @* Wrap Footer component semantically *@
+        @* Assume Footer component handles its internal structure and styling *@
         <Footer />
     </footer>
 
 </div> @* End of main flex container *@
 
 
-@* Keep the standard Blazor error UI *@
+@* Standard Blazor error UI *@
 <div id="blazor-error-ui" data-nosnippet>
     An unhandled error has occurred.
     <a href="." class="reload">Reload</a>
     <span class="dismiss">🗙</span>
 </div>
+
+@code {
+    // Code behind for MainLayout if needed
+}

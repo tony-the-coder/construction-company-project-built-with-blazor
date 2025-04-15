@@ -41,7 +41,7 @@ else
                     AllowPaging="true" PageSize="10" PagerHorizontalAlign="HorizontalAlign.Left" ShowPagingSummary="true"
                     AllowSorting="true"
                     EditMode="DataGridEditMode.Single" RowUpdate="@OnUpdateRow" RowCreate="@OnCreateRow"
-                    IsLoading="@_isLoading" @* Bind grid loading state *@
+                    IsLoading="@_isLoading"
                     class="min-w-full shadow rounded-lg overflow-hidden border border-subtle dark:border-gray-700"> @* Added subtle border *@
         <Columns>
             @* Name Column - Use RadzenTextBox which inherits Radzen styling *@

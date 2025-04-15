@@ -1,0 +1,61 @@
+﻿@* File: Components/Layout/LoginDisplay.razor *@
+@using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.AspNetCore.Components.Server.ProtectedBrowserStorage 
+
+@inject NavigationManager Navigation
+@* Optional: Inject SignInManager if handling logout directly here, but form is safer *@
+@* @inject SignInManager<ApplicationUser> SignInManager *@ 
+
+<AuthorizeView>
+    <Authorized>
+        @* Show User Info and Logout Form when logged in *@
+        <div class="flex items-center space-x-3 text-sm">
+            <a class="text-secondary hover:text-accent" href="/Account/Manage" title="Manage your account">
+                Hello, @context.User.Identity?.Name!
+            </a>
+
+            @* Logout Form (Recommended method for CSRF protection) *@
+            <form action="/Account/Logout" method="post">
+                <AntiforgeryToken />
+                <input type="hidden" name="ReturnUrl" value="/" /> @* Redirect to home page after logout *@
+                <button type="submit" class="text-secondary hover:text-accent">
+                    Logout
+                </button>
+            </form>
+
+            @* Alternative Logout Link (Less secure than form, requires JS/code-behind usually) *@
+            @* <button @onclick="BeginLogOut" class="text-secondary hover:text-accent">Logout</button> *@
+        </div>
+    </Authorized>
+    <NotAuthorized>
+        @* Show Register and Login links when logged out *@
+        <div class="flex items-center space-x-3 text-sm">
+            <a class="text-secondary hover:text-accent" href="/Account/Register">Register</a>
+            <a class="text-secondary hover:text-accent" href="/Account/Login">Log in</a>
+        </div>
+    </NotAuthorized>
+</AuthorizeView>
+
+@code {
+    // --- Optional code for handling logout via button click ---
+    // Requires injecting SignInManager and potentially ProtectedSessionStorage
+    //
+    // [Inject] private SignInManager<ApplicationUser> SignInManager { get; set; } = default!;
+    // [Inject] private ProtectedSessionStorage ProtectedSessionStore { get; set; } = default!;
+    //
+    // private async Task BeginLogOut(MouseEventArgs args)
+    // {
+    //     if (SignInManager.IsSignedIn(context.User)) // Need context from AuthorizeView parameter
+    //     {
+    //          await SignInManager.SignOutAsync();
+    //          // Optional: Clear any session storage if needed
+    //          // await ProtectedSessionStore.DeleteAsync("YourSessionKey");
+    //          Navigation.NavigateTo("/"); // Redirect after logout
+    //     }
+    // }
+    //
+    // Need to capture context if using button @onclick:
+    // <Authorized Context="authContext">
+    //    ... <button @onclick="() => BeginLogOut(authContext)" ...>
+    // </Authorized>
+}
