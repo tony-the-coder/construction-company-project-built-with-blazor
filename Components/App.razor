@@ -5,24 +5,23 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <base href="/" />
-    <link rel="stylesheet" href="_content/Radzen.Blazor/css/material-base.css" />
-    <link rel="stylesheet" href="styles/output.css" /> @* Compiled Tailwind CSS *@
-    <link rel="stylesheet" href="LehmanCustomConstruction.styles.css" /> @* Blazor CSS isolation *@
+    <link rel="stylesheet" href="_content/Radzen.Blazor/css/material-base.css" /> @* Or your chosen base theme *@
+    <link rel="stylesheet" href="styles/output.css" />
+    <link rel="stylesheet" href="LehmanCustomConstruction.styles.css" />
     <link rel="icon" type="image/png" href="favicon.png" />
-
-    @* --- MODIFIED: Use RadzenTheme component for dark theme --- *@
-    @* <RadzenTheme Theme="material-dark" @rendermode="InteractiveServer" /> *@
-    @* --- END MODIFICATION --- *@
-
-    <HeadOutlet @rendermode="InteractiveServer" />
+    <HeadOutlet @rendermode="InteractiveServer" /> @* Or your default rendermode *@
 </head>
 
 <body>
-    <Routes @rendermode="InteractiveServer" />
+    @* --- >>> ENSURE THIS WRAPPER EXISTS <<< --- *@
+    <CascadingAuthenticationState>
+        <Routes @rendermode="InteractiveServer" /> @* Or your default rendermode *@
+    </CascadingAuthenticationState>
+    @* --- >>> END WRAPPER <<< --- *@
 
-    <script src="https://cdn.jsdelivr.net/npm/flowbite@3.1.2/dist/flowbite.min.js"></script> @* Keep Flowbite JS *@
-    <script src="_framework/blazor.web.js"></script> @* Keep Blazor JS *@
-    <script src="_content/Radzen.Blazor/Radzen.Blazor.js?v=@(typeof(Radzen.Colors).Assembly.GetName().Version)"></script> @* Keep Radzen JS *@
+    <script src="https://cdn.jsdelivr.net/npm/flowbite@3.1.2/dist/flowbite.min.js"></script>
+    <script src="_framework/blazor.web.js"></script>
+    <script src="_content/Radzen.Blazor/Radzen.Blazor.js?v=@(typeof(Radzen.Colors).Assembly.GetName().Version)"></script>
 </body>
 
 </html>
