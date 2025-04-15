@@ -8,13 +8,16 @@
 @using Microsoft.AspNetCore.WebUtilities
 @using LehmanCustomConstruction.Data
 
+@* --- Corrected Injections --- *@
 @inject UserManager<ApplicationUser> UserManager
 @inject IUserStore<ApplicationUser> UserStore
 @inject SignInManager<ApplicationUser> SignInManager
 @inject IEmailSender<ApplicationUser> EmailSender
 @inject ILogger<Register> Logger
-@inject NavigationManager NavigationManager
-@inject IdentityRedirectManager RedirectManager
+@* Removed duplicate/unused @inject lines below *@
+@* @inject NavigationManager NavigationManager *@
+@* @inject IdentityRedirectManager RedirectManager *@
+@* --- End Corrected Injections --- *@
 
 <PageTitle>Register</PageTitle>
 
@@ -22,11 +25,22 @@
 
 <div class="row">
     <div class="col-lg-6">
-        <StatusMessage Message="@Message" />
-        <EditForm Model="Input" asp-route-returnUrl="@ReturnUrl" method="post" OnValidSubmit="RegisterUser" FormName="register">
+        @* Display specific errors from identityErrors if they exist *@
+        @if (identityErrors is not null)
+        {
+            <div class="alert alert-danger" role="alert">
+                @foreach (var error in identityErrors)
+                {
+                    <p>@error.Description</p>
+                }
+            </div>
+        }
+
+        <EditForm Model="Input" method="post" OnValidSubmit="RegisterUser" FormName="register">
             <DataAnnotationsValidator />
             <h2>Create a new account.</h2>
             <hr />
+            @* Keep ValidationSummary for field-level errors *@
             <ValidationSummary class="text-danger" role="alert" />
             <div class="form-floating mb-3">
                 <InputText @bind-Value="Input.Email" id="Input.Email" class="form-control" autocomplete="username" aria-required="true" placeholder="name@example.com" />
@@ -50,7 +64,7 @@
         <section>
             <h3>Use another service to register.</h3>
             <hr />
-            @* <ExternalLoginPicker /> *@
+            @* <ExternalLoginPicker ReturnUrl="@ReturnUrl" /> *@ @* Assuming you have this component if needed *@
         </section>
     </div>
 </div>
@@ -64,10 +78,17 @@
     [SupplyParameterFromQuery]
     private string? ReturnUrl { get; set; }
 
-    private string? Message => identityErrors is null ? null : $"Error: {string.Join(", ", identityErrors.Select(error => error.Description))}";
+    // Inject standard NavigationManager using property injection
+    [Inject] private NavigationManager NavigationManager { get; set; } = default!;
+    // Keep other injections from top level (UserManager, UserStore etc. are implicitly available)
+    // Note: Services injected via @inject at the top are directly usable in the @code block.
+    // Services injected via [Inject] property are also usable. Mixing is allowed,
+    // but having the *same service* injected both ways causes the error. We keep the property injection.
+
 
     public async Task RegisterUser(EditContext editContext)
     {
+        identityErrors = null; // Clear previous errors
         var user = CreateUser();
 
         await UserStore.SetUserNameAsync(user, Input.Email, CancellationToken.None);
@@ -78,30 +99,52 @@
         if (!result.Succeeded)
         {
             identityErrors = result.Errors;
-            return;
+            Logger.LogWarning($"User creation failed for {Input.Email}: {string.Join(", ", result.Errors.Select(e => e.Description))}");
+            StateHasChanged(); // Display errors
+            return; // Stop execution on failure
         }
 
-        Logger.LogInformation("User created a new account with password.");
+        // --- User Creation Succeeded ---
+        Logger.LogInformation($"User '{Input.Email}' created a new account with password.");
 
         var userId = await UserManager.GetUserIdAsync(user);
         var code = await UserManager.GenerateEmailConfirmationTokenAsync(user);
         code = WebEncoders.Base64UrlEncode(Encoding.UTF8.GetBytes(code));
-        var callbackUrl = NavigationManager.GetUriWithQueryParameters(
-            NavigationManager.ToAbsoluteUri("Account/ConfirmEmail").AbsoluteUri,
+
+        // Construct the confirmation URL using the injected NavigationManager property
+        var confirmationLink = NavigationManager.GetUriWithQueryParameters( // Use the property here
+            NavigationManager.ToAbsoluteUri("Account/ConfirmEmail").AbsoluteUri, // Use the property here
             new Dictionary<string, object?> { ["userId"] = userId, ["code"] = code, ["returnUrl"] = ReturnUrl });
 
-        await EmailSender.SendConfirmationLinkAsync(user, Input.Email, HtmlEncoder.Default.Encode(callbackUrl));
+        Logger.LogInformation($"Confirmation email link generated (but likely not sent) for {Input.Email}. Callback: {confirmationLink}");
 
-        if (UserManager.Options.SignIn.RequireConfirmedAccount)
+        try
         {
-            RedirectManager.RedirectTo(
-                "Account/RegisterConfirmation",
-                new() { ["email"] = Input.Email, ["returnUrl"] = ReturnUrl });
+            await EmailSender.SendConfirmationLinkAsync(user, Input.Email, HtmlEncoder.Default.Encode(confirmationLink));
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, $"Error attempting to 'send' confirmation email to {Input.Email}");
         }
 
-        await SignInManager.SignInAsync(user, isPersistent: false);
-        RedirectManager.RedirectTo(ReturnUrl);
+        // --- Redirect using NavigationManager property ---
+        if (UserManager.Options.SignIn.RequireConfirmedAccount)
+        {
+            Logger.LogInformation($"Redirecting '{Input.Email}' to RegisterConfirmation page using NavigationManager.");
+            var registerConfirmationUri = NavigationManager.GetUriWithQueryParameters( // Use the property here
+                "Account/RegisterConfirmation",
+                new Dictionary<string, object?> { ["email"] = Input.Email, ["returnUrl"] = ReturnUrl });
+
+            NavigationManager.NavigateTo(registerConfirmationUri); // Use the property here
+        }
+        else
+        {
+            await SignInManager.SignInAsync(user, isPersistent: false); // Still potential "Headers read-only" here
+            Logger.LogInformation($"Signed in user '{Input.Email}' immediately after registration.");
+            NavigationManager.NavigateTo(ReturnUrl ?? "/"); // Use the property here
+        }
     }
+
 
     private ApplicationUser CreateUser()
     {
@@ -109,10 +152,10 @@
         {
             return Activator.CreateInstance<ApplicationUser>();
         }
-        catch
+        catch (Exception ex)
         {
             throw new InvalidOperationException($"Can't create an instance of '{nameof(ApplicationUser)}'. " +
-                $"Ensure that '{nameof(ApplicationUser)}' is not an abstract class and has a parameterless constructor.");
+                $"Ensure that '{nameof(ApplicationUser)}' is not an abstract class and has a parameterless constructor.", ex);
         }
     }
 
@@ -122,7 +165,11 @@
         {
             throw new NotSupportedException("The default UI requires a user store with email support.");
         }
-        return (IUserEmailStore<ApplicationUser>)UserStore;
+        if (UserStore is not IUserEmailStore<ApplicationUser> emailStore)
+        {
+            throw new NotSupportedException($"The injected IUserStore is not an {nameof(IUserEmailStore<ApplicationUser>)}.");
+        }
+        return emailStore;
     }
 
     private sealed class InputModel

@@ -3,7 +3,8 @@ using LehmanCustomConstruction.Data;
 using LehmanCustomConstruction.Data.Blogs;
 using LehmanCustomConstruction.Data.Blogs.Interfaces;
 using Microsoft.EntityFrameworkCore;
-using System; // Required for ArgumentNullException
+using Microsoft.Extensions.DependencyInjection; // For IServiceProvider, CreateScope, GetRequiredService
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -12,17 +13,21 @@ namespace LehmanCustomConstruction.Data.Blogs.Repository
 {
     public class BlogCategoryRepository : IBlogCategoryRepository
     {
-        private readonly IDbContextFactory<ApplicationDbContext> _contextFactory;
+        // --- Inject IServiceProvider ---
+        private readonly IServiceProvider _serviceProvider;
 
-        public BlogCategoryRepository(IDbContextFactory<ApplicationDbContext> contextFactory)
+        public BlogCategoryRepository(IServiceProvider serviceProvider) // Updated constructor
         {
-            _contextFactory = contextFactory;
+            _serviceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
         }
+        // --- End IServiceProvider Injection ---
 
         // --- GetAllAsync ---
         public async Task<IEnumerable<BlogCategory>> GetAllAsync()
         {
-            await using var context = await _contextFactory.CreateDbContextAsync();
+            using var scope = _serviceProvider.CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+
             return await context.BlogCategories
                                  .OrderBy(c => c.Name)
                                  .ToListAsync();
@@ -32,7 +37,10 @@ namespace LehmanCustomConstruction.Data.Blogs.Repository
         // --- GetByIdAsync ---
         public async Task<BlogCategory?> GetByIdAsync(int categoryId)
         {
-            await using var context = await _contextFactory.CreateDbContextAsync();
+            using var scope = _serviceProvider.CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+
+            // Use FindAsync if you don't need related data immediately
             return await context.BlogCategories.FindAsync(categoryId);
             // Or use FirstOrDefaultAsync if you need to include related posts:
             // return await context.BlogCategories
@@ -46,7 +54,9 @@ namespace LehmanCustomConstruction.Data.Blogs.Repository
         {
             if (category == null) throw new ArgumentNullException(nameof(category));
 
-            await using var context = await _contextFactory.CreateDbContextAsync();
+            using var scope = _serviceProvider.CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+
             // Optional: Ensure Slug is set and formatted if necessary before adding
             // category.Slug = GenerateSlug(category.Slug ?? category.Name); // Example slug generation
 
@@ -61,12 +71,13 @@ namespace LehmanCustomConstruction.Data.Blogs.Repository
         {
             if (category == null) throw new ArgumentNullException(nameof(category));
 
-            await using var context = await _contextFactory.CreateDbContextAsync();
+            using var scope = _serviceProvider.CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
 
             // Optional: Ensure Slug is set/updated and formatted
             // category.Slug = GenerateSlug(category.Slug ?? category.Name); // Example
 
-            context.Entry(category).State = EntityState.Modified; // Mark entire entity as modified
+            context.BlogCategories.Update(category); // Mark entire entity as modified (or attach and set state)
 
             try
             {
@@ -75,16 +86,18 @@ namespace LehmanCustomConstruction.Data.Blogs.Repository
             catch (DbUpdateConcurrencyException ex)
             {
                 Console.WriteLine($"Concurrency error updating category: {ex.Message}");
-                throw; // Rethrow for now
+                // Consider logging this properly instead of just Console.WriteLine
+                throw; // Rethrow or handle appropriately
             }
             return category;
         }
         // -----------------
 
-        // --- UPDATED DeleteAsync with Usage Check ---
+        // --- DeleteAsync (with Usage Check) ---
         public async Task<bool> DeleteAsync(int categoryId)
         {
-            await using var context = await _contextFactory.CreateDbContextAsync();
+            using var scope = _serviceProvider.CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
 
             // 1. Check if the category is associated with any blog posts
             bool isInUse = await context.BlogPostCategories
@@ -94,8 +107,7 @@ namespace LehmanCustomConstruction.Data.Blogs.Repository
             {
                 // Category is linked, prevent deletion.
                 Console.WriteLine($"Attempted to delete category ID {categoryId} which is currently in use.");
-                // Returning false will trigger the "Deletion Failed" notification in ManageBlogCategories.razor
-                return false;
+                return false; // Indicate deletion failed due to usage
             }
 
             // 2. If not in use, proceed to find and delete the category
@@ -112,13 +124,17 @@ namespace LehmanCustomConstruction.Data.Blogs.Repository
         }
         // --- END UPDATED DeleteAsync ---
 
+        // --- GetBySlugAsync ---
         public async Task<BlogCategory?> GetBySlugAsync(string slug)
         {
             if (string.IsNullOrWhiteSpace(slug)) return null;
 
-            await using var context = await _contextFactory.CreateDbContextAsync();
+            using var scope = _serviceProvider.CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+
             return await context.BlogCategories
                                  .FirstOrDefaultAsync(c => c.Slug == slug);
         }
+        // --------------------
     }
 }

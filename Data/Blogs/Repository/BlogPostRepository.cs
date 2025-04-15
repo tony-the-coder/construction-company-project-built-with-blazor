@@ -1,29 +1,35 @@
 ﻿// File Path: Data/Blogs/Repository/BlogPostRepository.cs
-using LehmanCustomConstruction.Data; // Required for ApplicationDbContext
-using LehmanCustomConstruction.Data.Blogs; // Required for BlogPost, BlogCategory etc.
-using LehmanCustomConstruction.Data.Blogs.Interfaces; // Required for IBlogPostRepository
-using Microsoft.EntityFrameworkCore; // Required for EF Core methods, DbContextFactory
-using System; // Required for ArgumentNullException
-using System.Collections.Generic; // Required for IEnumerable, List
-using System.Linq; // Required for LINQ methods like Where, OrderByDescending etc.
-using System.Threading.Tasks; // Required for async Task
+using LehmanCustomConstruction.Data;
+using LehmanCustomConstruction.Data.Blogs;
+using LehmanCustomConstruction.Data.Blogs.Interfaces;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection; // For IServiceProvider, CreateScope, GetRequiredService
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
 
 namespace LehmanCustomConstruction.Data.Blogs.Repository
 {
     public class BlogPostRepository : IBlogPostRepository
     {
-        private readonly IDbContextFactory<ApplicationDbContext> _contextFactory;
+        // --- Inject IServiceProvider ---
+        private readonly IServiceProvider _serviceProvider;
 
-        public BlogPostRepository(IDbContextFactory<ApplicationDbContext> contextFactory)
+        public BlogPostRepository(IServiceProvider serviceProvider) // Updated constructor
         {
-            _contextFactory = contextFactory;
+            _serviceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
         }
+        // --- End IServiceProvider Injection ---
 
         // --- AddAsync ---
         public async Task<BlogPost> AddAsync(BlogPost entity)
         {
             if (entity == null) throw new ArgumentNullException(nameof(entity));
-            await using var context = await _contextFactory.CreateDbContextAsync();
+
+            using var scope = _serviceProvider.CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+
             entity.BlogPostCategories ??= new List<BlogPostCategory>(); // Ensure collection exists
             await context.BlogPosts.AddAsync(entity);
             await context.SaveChangesAsync();
@@ -34,7 +40,9 @@ namespace LehmanCustomConstruction.Data.Blogs.Repository
         // --- DeleteAsync ---
         public async Task<bool> DeleteAsync(int id)
         {
-            await using var context = await _contextFactory.CreateDbContextAsync();
+            using var scope = _serviceProvider.CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+
             var obj = await context.BlogPosts.FirstOrDefaultAsync(x => x.ID == id);
             if (obj != null)
             {
@@ -45,21 +53,22 @@ namespace LehmanCustomConstruction.Data.Blogs.Repository
         }
         // ---------------
 
-        // --- MODIFIED GetAllAsync ---
-        public async Task<IEnumerable<BlogPost>> GetAllAsync(bool publishedOnly = false) // Added parameter
+        // --- GetAllAsync ---
+        public async Task<IEnumerable<BlogPost>> GetAllAsync(bool publishedOnly = false)
         {
-            await using var context = await _contextFactory.CreateDbContextAsync();
+            using var scope = _serviceProvider.CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+
             var query = context.BlogPosts
-                               .Include(p => p.BlogPostCategories) // Include categories
-                               .ThenInclude(bpc => bpc.BlogCategory) // Include category details
+                               .Include(p => p.BlogPostCategories)
+                               .ThenInclude(bpc => bpc.BlogCategory)
                                .AsQueryable();
 
             if (publishedOnly)
             {
-                query = query.Where(p => p.IsPublished); // Apply filter if requested
+                query = query.Where(p => p.IsPublished);
             }
 
-            // Always order, most recent first
             return await query.OrderByDescending(p => p.PublishDate)
                               .ToListAsync();
         }
@@ -68,10 +77,12 @@ namespace LehmanCustomConstruction.Data.Blogs.Repository
         // --- GetByIdAsync (For Admin Editing - includes drafts) ---
         public async Task<BlogPost?> GetByIdAsync(int id)
         {
-            await using var context = await _contextFactory.CreateDbContextAsync();
+            using var scope = _serviceProvider.CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+
             return await context.BlogPosts
-                                 .Include(b => b.BlogPostCategories) // Load the join table entries
-                                 .ThenInclude(bpc => bpc.BlogCategory) // Load actual category details
+                                 .Include(b => b.BlogPostCategories)
+                                 .ThenInclude(bpc => bpc.BlogCategory)
                                  .FirstOrDefaultAsync(b => b.ID == id);
         }
         // -----------------------------------------------------------
@@ -80,59 +91,63 @@ namespace LehmanCustomConstruction.Data.Blogs.Repository
         public async Task<BlogPost?> GetBySlugAsync(string slug)
         {
             if (string.IsNullOrWhiteSpace(slug)) return null;
-            await using var context = await _contextFactory.CreateDbContextAsync();
+
+            using var scope = _serviceProvider.CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+
             return await context.BlogPosts
-                                 .Include(b => b.BlogPostCategories) // Example include
-                                 .ThenInclude(bc => bc.BlogCategory)  // Example include
+                                 .Include(b => b.BlogPostCategories)
+                                 .ThenInclude(bc => bc.BlogCategory)
                                  .FirstOrDefaultAsync(x => x.Slug == slug);
         }
         // -------------------------------------------------------
 
-        // --- ADDED GetPublishedPostBySlugAsync (For Public View) ---
+        // --- GetPublishedPostBySlugAsync (For Public View) ---
         public async Task<BlogPost?> GetPublishedPostBySlugAsync(string slug)
         {
             if (string.IsNullOrWhiteSpace(slug)) return null;
-            await using var context = await _contextFactory.CreateDbContextAsync();
 
-            // Include categories and ensure it's published
+            using var scope = _serviceProvider.CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+
             return await context.BlogPosts
-                                  .Where(p => p.Slug == slug && p.IsPublished) // Filter by slug AND published status
+                                  .Where(p => p.Slug == slug && p.IsPublished)
                                   .Include(p => p.BlogPostCategories)
                                   .ThenInclude(bpc => bpc.BlogCategory)
                                   .FirstOrDefaultAsync();
         }
         // --- END ADDED METHOD ---
 
-        // <<< --- START: ADDED MISSING IMPLEMENTATION --- >>>
         // --- GetPublishedPostsByCategorySlugAsync ---
         public async Task<IEnumerable<BlogPost>> GetPublishedPostsByCategorySlugAsync(string categorySlug)
         {
             if (string.IsNullOrWhiteSpace(categorySlug))
             {
-                return Enumerable.Empty<BlogPost>(); // Return empty if no slug provided
+                return Enumerable.Empty<BlogPost>();
             }
 
-            await using var context = await _contextFactory.CreateDbContextAsync();
+            using var scope = _serviceProvider.CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
 
             return await context.BlogPosts
-                                 .Where(p => p.IsPublished && p.BlogPostCategories.Any(bpc => bpc.BlogCategory.Slug == categorySlug)) // Filter by published AND category slug
-                                 .Include(p => p.BlogPostCategories) // Include needed data for cards
+                                 .Where(p => p.IsPublished && p.BlogPostCategories.Any(bpc => bpc.BlogCategory.Slug == categorySlug))
+                                 .Include(p => p.BlogPostCategories)
                                  .ThenInclude(bpc => bpc.BlogCategory)
-                                 .OrderByDescending(p => p.PublishDate) // Order results
+                                 .OrderByDescending(p => p.PublishDate)
                                  .ToListAsync();
         }
         // --- END ADDED MISSING IMPLEMENTATION ---
-
 
         // --- SlugExistsAsync ---
         public async Task<bool> SlugExistsAsync(int currentPostId, string slug)
         {
             if (string.IsNullOrWhiteSpace(slug)) return false;
 
-            await using var context = await _contextFactory.CreateDbContextAsync();
+            using var scope = _serviceProvider.CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+
             return await context.BlogPosts
                                 .Where(p => p.Slug == slug && p.ID != currentPostId)
-                                // Future: .Where(p => !p.IsDeleted)
                                 .AnyAsync();
         }
         // ---------------------
@@ -142,35 +157,51 @@ namespace LehmanCustomConstruction.Data.Blogs.Repository
         {
             if (entity == null) throw new ArgumentNullException(nameof(entity));
 
-            selectedCategoryIds ??= Enumerable.Empty<int>(); // Ensure not null
+            selectedCategoryIds ??= Enumerable.Empty<int>();
 
-            await using var context = await _contextFactory.CreateDbContextAsync();
+            using var scope = _serviceProvider.CreateScope();
+            var context = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
 
-            // 1. Attach the main entity and mark it as modified.
-            var attachedEntity = context.BlogPosts.Attach(entity);
-            attachedEntity.State = EntityState.Modified;
+            // IMPORTANT: Fetch the entity from the context *within this scope* before updating
+            // to ensure it's tracked by this context instance. Or Attach if you know it's detached.
+            // Let's assume the passed 'entity' might be detached or from another context.
+            // A safer approach is to fetch it first.
 
-            // 2. Get the current category IDs associated with this post *from the database*.
-            var existingCategoryIds = await context.BlogPostCategories
-                .Where(bc => bc.BlogPostId == entity.ID)
-                .Select(bc => bc.BlogCategoryId)
-                .ToListAsync();
+            var postToUpdate = await context.BlogPosts
+                                            .Include(p => p.BlogPostCategories) // Include existing categories
+                                            .FirstOrDefaultAsync(p => p.ID == entity.ID);
+
+            if (postToUpdate == null)
+            {
+                throw new InvalidOperationException($"Blog post with ID {entity.ID} not found.");
+            }
+
+            // Update scalar properties (Title, Content, Slug, etc.)
+            // Use the values from the passed-in 'entity' object
+            context.Entry(postToUpdate).CurrentValues.SetValues(entity); // Copies scalar properties
+
+            // Now handle categories based on the fetched 'postToUpdate'
+            var existingCategoryIds = postToUpdate.BlogPostCategories.Select(bc => bc.BlogCategoryId).ToList();
 
             // 3. Determine which categories to add.
             var categoryIdsToAdd = selectedCategoryIds.Except(existingCategoryIds).ToList();
             foreach (var categoryId in categoryIdsToAdd)
             {
-                context.BlogPostCategories.Add(new BlogPostCategory { BlogPostId = entity.ID, BlogCategoryId = categoryId });
+                postToUpdate.BlogPostCategories.Add(new BlogPostCategory { BlogCategoryId = categoryId });
+                // No need to set BlogPostId, EF Core handles it based on navigation property
             }
 
             // 4. Determine which categories to remove.
             var categoryIdsToRemove = existingCategoryIds.Except(selectedCategoryIds).ToList();
-            if (categoryIdsToRemove.Any())
+            foreach (var categoryIdToRemove in categoryIdsToRemove)
             {
-                var categoriesToRemove = await context.BlogPostCategories
-                    .Where(bc => bc.BlogPostId == entity.ID && categoryIdsToRemove.Contains(bc.BlogCategoryId))
-                    .ToListAsync();
-                context.BlogPostCategories.RemoveRange(categoriesToRemove);
+                var blogPostCategoryToRemove = postToUpdate.BlogPostCategories
+                                                            .FirstOrDefault(bpc => bpc.BlogCategoryId == categoryIdToRemove);
+                if (blogPostCategoryToRemove != null)
+                {
+                    postToUpdate.BlogPostCategories.Remove(blogPostCategoryToRemove); // Remove from navigation property
+                    // context.BlogPostCategories.Remove(blogPostCategoryToRemove); // Alternative if removing directly
+                }
             }
 
             // 5. Save changes.
@@ -185,7 +216,8 @@ namespace LehmanCustomConstruction.Data.Blogs.Repository
                 throw;
             }
 
-            return entity; // Return the original entity reference
+            // Return the updated tracked entity (or the original reference, depending on needs)
+            return postToUpdate;
         }
         // -----------------
     }

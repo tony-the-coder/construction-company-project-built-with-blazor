@@ -1,0 +1,26 @@
+﻿// File: Components/Pages/TestPage.razor
+@page "/test-page-page"
+@rendermode InteractiveServer
+
+<h3>Test Page</h3>
+
+<p>If you can see this and interact, the basic Blazor Server circuit works.</p>
+
+<button @onclick="IncrementCount">Click Me</button>
+<p>Current count: @_currentCount</p>
+
+@code {
+    private int _currentCount = 0;
+
+    private void IncrementCount()
+    {
+        _currentCount++;
+        Console.WriteLine($"TestPage: Count incremented to {_currentCount}"); // Add logging
+    }
+
+    protected override void OnInitialized()
+    {
+        Console.WriteLine($"TestPage: OnInitialized"); // Add logging
+        base.OnInitialized();
+    }
+}
