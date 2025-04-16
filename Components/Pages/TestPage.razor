@@ -1,26 +1,24 @@
-﻿// File: Components/Pages/TestPage.razor
-@page "/test-page-page"
-@rendermode InteractiveServer
+﻿@page "/asdf"
 
-<h3>Test Page</h3>
+<PageTitle>Index</PageTitle>
 
-<p>If you can see this and interact, the basic Blazor Server circuit works.</p>
+<h1>Hello, world!</h1>
 
-<button @onclick="IncrementCount">Click Me</button>
-<p>Current count: @_currentCount</p>
+<button @onclick="ToggleLoading" class="btn @(_isLoading ? "btn-secondary" : "btn-primary")">
+    Toggle Loading State
+</button>
+
+<hr class="my-3" />
+
+<button disabled="@_isLoading" class="btn @(_isLoading ? "btn-danger" : "btn-success")">
+    Test Disabled Button (Is Loading: @_isLoading)
+</button>
 
 @code {
-    private int _currentCount = 0;
+    private bool _isLoading = false;
 
-    private void IncrementCount()
+    private void ToggleLoading()
     {
-        _currentCount++;
-        Console.WriteLine($"TestPage: Count incremented to {_currentCount}"); // Add logging
-    }
-
-    protected override void OnInitialized()
-    {
-        Console.WriteLine($"TestPage: OnInitialized"); // Add logging
-        base.OnInitialized();
+        _isLoading = !_isLoading;
     }
 }

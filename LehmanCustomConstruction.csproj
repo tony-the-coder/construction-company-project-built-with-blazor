@@ -29,9 +29,10 @@
     <Folder Include="Components\Forms\" />
     <Folder Include="Components\UI\" />
     <Folder Include="Components\Portfolio\" />
+    <Folder Include="Data\Models\" />
+    <Folder Include="Data\Portal\" />
     <Folder Include="Data\Portfolio\" />
     <Folder Include="dead-ideas\" />
-    <Folder Include="Controllers\" />
     <Folder Include="wwwroot\images\logos\" />
   </ItemGroup>
 
