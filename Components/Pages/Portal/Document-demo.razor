@@ -1,10 +1,14 @@
 ﻿@page "/portal/documents-demo"
 @inject ILogger<Document_demo> Logger
 @inject IConfiguration Configuration
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject ApplicationDbContext DbContext
 
+@using LehmanCustomConstruction.Data.Common
 @using Microsoft.AspNetCore.Components.Forms
 @using System.IO
 @using System.ComponentModel.DataAnnotations
+@using Microsoft.EntityFrameworkCore
 
 <PageTitle>Document Upload and View</PageTitle>
 
@@ -49,10 +53,6 @@
 <div class="bg-white border border-subtle rounded-lg shadow-sm p-6">
     <h4 class="text-xl font-semibold text-primary mb-4 font-serif">Uploaded Documents</h4>
 
-    <p class="text-sm text-gray-600 mb-4">
-        <strong>Upload Directory:</strong> <span class="text-blue-600">@_uploadDirectory</span>
-    </p>
-
     @if (_uploadedFiles == null || !_uploadedFiles.Any())
     {
         <p class="text-secondary">No documents uploaded yet.</p>
@@ -73,10 +73,10 @@
                     @foreach (var file in _uploadedFiles)
                     {
                         <tr>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">@file.FileName</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">@file.OriginalFileName</td>
                             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">@file.Description</td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">@file.UploadedOn.ToString("yyyy-MM-dd HH:mm")</td>
-                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">@FormatFileSize(file.Size)</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">@file.UploadTimestamp.ToString("yyyy-MM-dd HH:mm")</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">@FormatFileSize(file.FileSize)</td>
                         </tr>
                     }
                 </tbody>
@@ -91,9 +91,9 @@
     private string? _uploadResultMessage;
     private bool _uploadSuccess;
 
-    private List<UploadedFile> _uploadedFiles = new();
+    private List<CustomerDocument> _uploadedFiles = new();
 
-    private readonly string _uploadDirectory = @"C:\Users\tonyt\Desktop\Development\LehmanConstructionUploads";
+    private readonly string _baseUploadDirectory = @"C:\Users\tonyt\Desktop\Development\LehmanConstructionUploads";
     private readonly long _maxFileSize = 20 * 1024 * 1024; // 20 MB
 
     private class UploadModel
@@ -105,12 +105,22 @@
         public string? Description { get; set; }
     }
 
-    private class UploadedFile
+    protected override async Task OnInitializedAsync()
     {
-        public string FileName { get; set; } = string.Empty;
-        public string? Description { get; set; }
-        public DateTime UploadedOn { get; set; }
-        public long Size { get; set; }
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+
+        if (user.Identity?.IsAuthenticated ?? false)
+        {
+            var userId = user.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+            if (userId != null)
+            {
+                _uploadedFiles = await DbContext.CustomerDocuments
+                    .Where(d => d.UploadedById == userId)
+                    .OrderByDescending(d => d.UploadTimestamp)
+                    .ToListAsync();
+            }
+        }
     }
 
     private async Task HandleFileSelected(InputFileChangeEventArgs e)
@@ -147,28 +157,54 @@
             return;
         }
 
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+
+        if (!(user.Identity?.IsAuthenticated ?? false))
+        {
+            _uploadResultMessage = "You must be logged in to upload files.";
+            _uploadSuccess = false;
+            return;
+        }
+
+        var userId = user.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+        if (userId == null)
+        {
+            _uploadResultMessage = "Unable to determine user identity.";
+            _uploadSuccess = false;
+            return;
+        }
+
         try
         {
-            if (!Directory.Exists(_uploadDirectory))
+            var userDirectory = Path.Combine(_baseUploadDirectory, userId);
+            if (!Directory.Exists(userDirectory))
             {
-                Directory.CreateDirectory(_uploadDirectory);
+                Directory.CreateDirectory(userDirectory);
             }
 
             string uniqueFileName = $"{Guid.NewGuid()}{Path.GetExtension(_uploadModel.FileToUpload.Name)}";
-            string filePath = Path.Combine(_uploadDirectory, uniqueFileName);
+            string filePath = Path.Combine(userDirectory, uniqueFileName);
 
             await using FileStream fs = new(filePath, FileMode.Create);
             await _uploadModel.FileToUpload.OpenReadStream(_maxFileSize).CopyToAsync(fs);
 
-            var uploadedFile = new UploadedFile
+            var document = new CustomerDocument
                 {
-                    FileName = _uploadModel.FileToUpload.Name,
+                    OriginalFileName = _uploadModel.FileToUpload.Name,
+                    StoredFileName = uniqueFileName,
+                    ContentType = _uploadModel.FileToUpload.ContentType ?? "application/octet-stream",
+                    FileSize = _uploadModel.FileToUpload.Size,
+                    UploadTimestamp = DateTime.UtcNow,
                     Description = _uploadModel.Description,
-                    UploadedOn = DateTime.Now,
-                    Size = _uploadModel.FileToUpload.Size
+                    UploadedById = userId,
+                    TargetUserId = userId // Ensure this is set correctly
                 };
 
-            _uploadedFiles.Add(uploadedFile);
+            DbContext.CustomerDocuments.Add(document);
+            await DbContext.SaveChangesAsync();
+
+            _uploadedFiles.Add(document);
 
             _uploadResultMessage = $"File '{_uploadModel.FileToUpload.Name}' uploaded successfully.";
             _uploadSuccess = true;
@@ -177,11 +213,12 @@
         }
         catch (Exception ex)
         {
-            Logger.LogError(ex, "Error during file upload.");
+            Logger.LogError(ex, "Error during file upload. Inner Exception: {InnerException}", ex.InnerException?.Message);
             _uploadResultMessage = $"Error uploading file: {ex.Message}";
             _uploadSuccess = false;
         }
     }
+
 
     private string FormatFileSize(long bytes)
     {
@@ -192,4 +229,3 @@
         return $"{(double)bytes / megabyte:F1} MB";
     }
 }
-
