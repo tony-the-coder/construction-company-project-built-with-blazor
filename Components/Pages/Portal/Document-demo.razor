@@ -32,10 +32,7 @@
             <label for="documentFile" class="block text-sm font-medium text-gray-700 mb-1">Select File</label>
             <InputFile id="documentFile" OnChange="HandleFileSelected" class="block w-full text-sm text-gray-900 border border-gray-300 rounded-lg cursor-pointer bg-gray-50 focus:outline-none" />
             <ValidationMessage For="@(() => _uploadModel.FileToUpload)" />
-            @if (_isFileLoading)
-            {
-                <p class="text-sm text-blue-600 mt-1">Processing file selection...</p>
-            }
+            @if (_isFileLoading) { <p class="text-sm text-blue-600 mt-1">Processing file selection...</p> }
         </div>
         <div class="mb-4">
             <label for="description" class="block text-sm font-medium text-gray-700 mb-1">Description (Optional)</label>
@@ -68,17 +65,17 @@
                         @FormatFileSize(doc.FileSize)
                     </Template>
                 </RadzenDataGridColumn>
-
+                
                 @* --- New Download Column --- *@
                 <RadzenDataGridColumn TItem="CustomerDocument" Title="Download" Sortable="false" Filterable="false" Width="100px" TextAlign="TextAlign.Center">
                     <Template Context="doc">
                         @* Link directly to the download endpoint, passing the document ID *@
                         <a href="@($"/download/{doc.Id}")" target="_blank" class="text-accent hover:text-accent-dark font-medium">
-                            Download
-                            @* Optional: Use an icon instead/as well *@
-                            @* <i class="fas fa-download"></i> *@
+                           Download
+                           @* Optional: Use an icon instead/as well *@
+                           @* <i class="fas fa-download"></i> *@
                         </a>
-                        @* --- Alternative: Button triggering C# method (more complex) ---
+                         @* --- Alternative: Button triggering C# method (more complex) ---
                            <RadzenButton ButtonStyle="ButtonStyle.Info" Icon="download" Size="ButtonSize.ExtraSmall" Click=@(() => DownloadFile(doc.Id)) />
                          *@
                     </Template>
@@ -119,13 +116,13 @@
         {
             Logger.LogWarning("FileUploadSettings:BasePath is not configured in appsettings.json. Using default path: {DefaultPath}", BaseUploadDirectory);
         }
-
+        
         await LoadUserDocuments();
     }
 
     private async Task LoadUserDocuments()
     {
-        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+         var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
         var user = authState.User;
 
         if (user.Identity?.IsAuthenticated ?? false)
@@ -156,7 +153,7 @@
         }
         else
         {
-            _uploadedFiles = new List<CustomerDocument>();
+             _uploadedFiles = new List<CustomerDocument>();
         }
     }
 
@@ -226,8 +223,8 @@
         string baseDir = BaseUploadDirectory; // Use property
         if (string.IsNullOrWhiteSpace(baseDir) || baseDir.Length < 3) // Basic sanity check
         {
-            _uploadResultMessage = "Server configuration error: Upload directory is not configured correctly.";
-            _uploadSuccess = false; return;
+             _uploadResultMessage = "Server configuration error: Upload directory is not configured correctly.";
+             _uploadSuccess = false; return;
         }
 
         string userDirectory = Path.Combine(baseDir, userId);
@@ -257,16 +254,12 @@
             await _uploadModel.FileToUpload.OpenReadStream(_maxFileSize).CopyToAsync(fs);
 
             var document = new CustomerDocument
-                {
-                    OriginalFileName = safeOriginalFileName,
-                    StoredFileName = uniqueFileName,
-                    ContentType = _uploadModel.FileToUpload.ContentType ?? "application/octet-stream",
-                    FileSize = _uploadModel.FileToUpload.Size,
-                    UploadTimestamp = DateTime.UtcNow,
-                    Description = _uploadModel.Description,
-                    UploadedById = userId,
-                    TargetUserId = userId
-                };
+            {
+                OriginalFileName = safeOriginalFileName, StoredFileName = uniqueFileName,
+                ContentType = _uploadModel.FileToUpload.ContentType ?? "application/octet-stream",
+                FileSize = _uploadModel.FileToUpload.Size, UploadTimestamp = DateTime.UtcNow,
+                Description = _uploadModel.Description, UploadedById = userId, TargetUserId = userId
+            };
 
             DbContext.CustomerDocuments.Add(document);
             await DbContext.SaveChangesAsync();
