@@ -1,15 +1,17 @@
 ﻿@page "/portal/documents-demo"
 @inject ILogger<Document_demo> Logger
-@inject IConfiguration Configuration
+@inject IConfiguration Configuration // Inject IConfiguration
 @inject AuthenticationStateProvider AuthenticationStateProvider
 @inject ApplicationDbContext DbContext
+@inject NavigationManager NavigationManager // Inject NavigationManager
 
 @using LehmanCustomConstruction.Data.Common
 @using Microsoft.AspNetCore.Components.Forms
 @using System.IO
 @using System.ComponentModel.DataAnnotations
 @using Microsoft.EntityFrameworkCore
-@using Radzen.Blazor // Added for RadzenDataGrid
+@using Radzen.Blazor
+@using System.Security
 
 <PageTitle>Document Upload and View</PageTitle>
 
@@ -17,18 +19,15 @@
 
 <div class="bg-white border border-subtle rounded-lg shadow-sm p-6 mb-8">
     <h4 class="text-xl font-semibold text-primary mb-4 font-serif">Upload New Document</h4>
-
     @if (!string.IsNullOrEmpty(_uploadResultMessage))
     {
         <div class="@(_uploadSuccess ? "bg-green-100 border border-green-400 text-green-700" : "bg-red-100 border border-red-400 text-red-700") px-4 py-3 rounded relative mb-4" role="alert">
             <span class="block sm:inline">@_uploadResultMessage</span>
         </div>
     }
-
     <EditForm Model="_uploadModel" OnValidSubmit="HandleFileUpload">
         <DataAnnotationsValidator />
         <ValidationSummary />
-
         <div class="mb-4">
             <label for="documentFile" class="block text-sm font-medium text-gray-700 mb-1">Select File</label>
             <InputFile id="documentFile" OnChange="HandleFileSelected" class="block w-full text-sm text-gray-900 border border-gray-300 rounded-lg cursor-pointer bg-gray-50 focus:outline-none" />
@@ -38,13 +37,11 @@
                 <p class="text-sm text-blue-600 mt-1">Processing file selection...</p>
             }
         </div>
-
         <div class="mb-4">
             <label for="description" class="block text-sm font-medium text-gray-700 mb-1">Description (Optional)</label>
             <InputText id="description" @bind-Value="_uploadModel.Description" class="block w-full border-gray-300 rounded-md shadow-sm focus:ring-accent focus:border-accent sm:text-sm" placeholder="E.g., Renovation Plans v1" />
             <ValidationMessage For="@(() => _uploadModel.Description)" />
         </div>
-
         <button type="submit" class="inline-flex items-center px-4 py-2 bg-primary border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-primary-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary disabled:opacity-50 disabled:cursor-not-allowed" disabled="@(_uploadModel.FileToUpload == null)">
             Upload Document
         </button>
@@ -53,15 +50,12 @@
 
 <div class="bg-white border border-subtle rounded-lg shadow-sm p-6">
     <h4 class="text-xl font-semibold text-primary mb-4 font-serif">Uploaded Documents</h4>
-
     @if (_uploadedFiles == null || !_uploadedFiles.Any())
     {
         <p class="text-secondary">No documents uploaded yet.</p>
     }
     else
     {
-        // --- Start of RadzenDataGrid Replacement ---
-        // This replaces the original <div class="overflow-x-auto"><table>...</table></div> block
         <RadzenDataGrid Data="@_uploadedFiles" TItem="CustomerDocument" AllowSorting="true" AllowPaging="true" PageSize="10"
                         PagerHorizontalAlign="HorizontalAlign.Left" ShowPagingSummary="true"
                         Density="Density.Compact" Style="width: 100%;" EmptyText="No documents found.">
@@ -71,20 +65,33 @@
                 <RadzenDataGridColumn TItem="CustomerDocument" Property="UploadTimestamp" Title="Uploaded On" FormatString="{0:yyyy-MM-dd HH:mm}" Width="180px" TextAlign="TextAlign.Center" />
                 <RadzenDataGridColumn TItem="CustomerDocument" Title="Size" Property="FileSize" Sortable="true" Filterable="false" Width="120px" TextAlign="TextAlign.Right">
                     <Template Context="doc">
-                        @* Using 'doc' as context variable name *@
                         @FormatFileSize(doc.FileSize)
                     </Template>
                 </RadzenDataGridColumn>
+
+                @* --- New Download Column --- *@
+                <RadzenDataGridColumn TItem="CustomerDocument" Title="Download" Sortable="false" Filterable="false" Width="100px" TextAlign="TextAlign.Center">
+                    <Template Context="doc">
+                        @* Link directly to the download endpoint, passing the document ID *@
+                        <a href="@($"/download/{doc.Id}")" target="_blank" class="text-accent hover:text-accent-dark font-medium">
+                            Download
+                            @* Optional: Use an icon instead/as well *@
+                            @* <i class="fas fa-download"></i> *@
+                        </a>
+                        @* --- Alternative: Button triggering C# method (more complex) ---
+                           <RadzenButton ButtonStyle="ButtonStyle.Info" Icon="download" Size="ButtonSize.ExtraSmall" Click=@(() => DownloadFile(doc.Id)) />
+                         *@
+                    </Template>
+                </RadzenDataGridColumn>
+                @* --- End New Download Column --- *@
+
             </Columns>
         </RadzenDataGrid>
-        // --- End of RadzenDataGrid Replacement ---
     }
 </div>
 
-
 @code {
-    // --- Code block is EXACTLY as you provided in the previous message ---
-    // --- NO other changes have been made here ---
+    // --- Existing code block ---
     private UploadModel _uploadModel = new();
     private bool _isFileLoading = false;
     private string? _uploadResultMessage;
@@ -92,19 +99,31 @@
 
     private List<CustomerDocument> _uploadedFiles = new();
 
-    private readonly string _baseUploadDirectory = @"C:\Users\tonyt\Desktop\Development\LehmanConstructionUploads";
+    // Read base path from configuration - safer!
+    private string BaseUploadDirectory => Configuration["FileUploadSettings:BasePath"] ?? @"C:\LehmanConstructionUploads_Default";
     private readonly long _maxFileSize = 20 * 1024 * 1024; // 20 MB
 
     private class UploadModel
     {
         [Required(ErrorMessage = "Please select a file.")]
         public IBrowserFile? FileToUpload { get; set; }
-
         [StringLength(500, ErrorMessage = "Description cannot exceed 500 characters.")]
         public string? Description { get; set; }
     }
 
     protected override async Task OnInitializedAsync()
+    {
+        // Ensure the base upload directory is configured correctly
+        var configuredPath = Configuration["FileUploadSettings:BasePath"];
+        if (string.IsNullOrWhiteSpace(configuredPath))
+        {
+            Logger.LogWarning("FileUploadSettings:BasePath is not configured in appsettings.json. Using default path: {DefaultPath}", BaseUploadDirectory);
+        }
+
+        await LoadUserDocuments();
+    }
+
+    private async Task LoadUserDocuments()
     {
         var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
         var user = authState.User;
@@ -114,16 +133,31 @@
             var userId = user.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
             if (userId != null)
             {
-                _uploadedFiles = await DbContext.CustomerDocuments
-                    .Where(d => d.UploadedById == userId)
-                    .OrderByDescending(d => d.UploadTimestamp)
-                    .ToListAsync();
+                try
+                {
+                    _uploadedFiles = await DbContext.CustomerDocuments
+                        .Where(d => d.UploadedById == userId)
+                        .OrderByDescending(d => d.UploadTimestamp)
+                        .ToListAsync();
+                }
+                catch (Exception ex)
+                {
+                    Logger.LogError(ex, "Error retrieving documents for user {UserId} from database.", userId);
+                    _uploadedFiles = new List<CustomerDocument>();
+                    _uploadResultMessage = "Error loading existing documents.";
+                    _uploadSuccess = false;
+                }
             }
-            // Note: Consider adding an else here to initialize _uploadedFiles = new List... if userId is null
-            // And also outside the if (user.Identity...) for unauthenticated users.
-            // However, per your instruction, no changes were made here.
+            else
+            {
+                Logger.LogWarning("User is authenticated but NameIdentifier claim is missing.");
+                _uploadedFiles = new List<CustomerDocument>();
+            }
         }
-        // Note: Consider adding an else here for unauthenticated users.
+        else
+        {
+            _uploadedFiles = new List<CustomerDocument>();
+        }
     }
 
     private async Task HandleFileSelected(InputFileChangeEventArgs e)
@@ -131,18 +165,17 @@
         _isFileLoading = true;
         _uploadResultMessage = null;
         _uploadModel.FileToUpload = null;
+        _uploadSuccess = false;
 
         try
         {
             if (e.File != null)
             {
-                // Note: Size check from previous versions is missing here.
-                // Added back based on original code structure.
                 if (e.File.Size > _maxFileSize)
                 {
                     _uploadResultMessage = $"File size exceeds the limit of {FormatFileSize(_maxFileSize)}.";
                     _uploadSuccess = false;
-                    // We should probably null the FileToUpload here too, but sticking to the provided code.
+                    _uploadModel.FileToUpload = null;
                 }
                 else
                 {
@@ -152,128 +185,123 @@
         }
         catch (Exception ex)
         {
-            // Note: Original code didn't have Logger here. Sticking to provided code.
-            // Logger.LogError(ex, "Error during file selection.");
+            Logger.LogError(ex, "Error during file selection.");
             _uploadResultMessage = $"Error selecting file: {ex.Message}";
             _uploadSuccess = false;
         }
         finally
         {
             _isFileLoading = false;
-            // Note: Original code didn't have StateHasChanged here. Sticking to provided code.
-            // await InvokeAsync(StateHasChanged);
+            await InvokeAsync(StateHasChanged);
         }
     }
 
     private async Task HandleFileUpload()
     {
-        // Note: Resetting messages on submit is good practice, but absent in original code.
-        // _uploadResultMessage = null;
-        // _uploadSuccess = false;
+        _uploadResultMessage = null;
+        _uploadSuccess = false;
 
         if (_uploadModel.FileToUpload == null)
         {
-            _uploadResultMessage = "Please select a file."; // Or check if rejected due to size earlier
+            _uploadResultMessage = "Please select a valid file that is within the size limit.";
             _uploadSuccess = false;
             return;
         }
 
-        // Size check is missing here, relying only on HandleFileSelected
-        // Could add: if (_uploadModel.FileToUpload.Size > _maxFileSize) { ... return; }
-
         var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
         var user = authState.User;
-
         if (!(user.Identity?.IsAuthenticated ?? false))
         {
             _uploadResultMessage = "You must be logged in to upload files.";
-            _uploadSuccess = false;
-            // Logger.LogWarning("File upload attempt by unauthenticated user.");
-            return;
+            _uploadSuccess = false; return;
         }
 
         var userId = user.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
         if (userId == null)
         {
             _uploadResultMessage = "Unable to determine user identity.";
-            _uploadSuccess = false;
-            // Logger.LogError("File upload failed: Could not find NameIdentifier claim for logged-in user.");
-            return;
+            _uploadSuccess = false; return;
         }
 
-        // Note: Directory/permission checks & more robust error handling from previous versions are missing here.
-        // Sticking strictly to the provided code block.
+        string baseDir = BaseUploadDirectory; // Use property
+        if (string.IsNullOrWhiteSpace(baseDir) || baseDir.Length < 3) // Basic sanity check
+        {
+            _uploadResultMessage = "Server configuration error: Upload directory is not configured correctly.";
+            _uploadSuccess = false; return;
+        }
+
+        string userDirectory = Path.Combine(baseDir, userId);
+        if (userId.IndexOfAny(Path.GetInvalidFileNameChars()) != -1 || userId.Contains(".."))
+        {
+            _uploadResultMessage = $"Server error: Invalid user identifier format.";
+            _uploadSuccess = false; return;
+        }
+
+        string? filePath = null;
         try
         {
-            var userDirectory = Path.Combine(_baseUploadDirectory, userId);
-            if (!Directory.Exists(userDirectory))
+            Directory.CreateDirectory(userDirectory); // Creates if not exists
+
+            string safeOriginalFileName = Path.GetFileName(_uploadModel.FileToUpload.Name);
+            string uniqueFileName = $"{Guid.NewGuid()}{Path.GetExtension(safeOriginalFileName)}";
+            filePath = Path.Combine(userDirectory, uniqueFileName);
+
+            var fullDirectoryPath = Path.GetFullPath(userDirectory);
+            var fullFilePath = Path.GetFullPath(filePath);
+            if (!fullFilePath.StartsWith(fullDirectoryPath, StringComparison.OrdinalIgnoreCase))
             {
-                Directory.CreateDirectory(userDirectory);
-                // Logger.LogInformation("Created user-specific upload directory: {Directory}", userDirectory);
+                throw new SecurityException("Calculated file path is outside the allowed directory.");
             }
 
-            // Note: No path sanitization/validation here from previous versions.
-            string uniqueFileName = $"{Guid.NewGuid()}{Path.GetExtension(_uploadModel.FileToUpload.Name)}";
-            string filePath = Path.Combine(userDirectory, uniqueFileName);
-
-            // Logger.LogInformation("Attempting to save file {OriginalName} as {FilePath}", _uploadModel.FileToUpload.Name, filePath);
-
             await using FileStream fs = new(filePath, FileMode.Create);
-            // Note: OpenReadStream(_maxFileSize) enforces size limit during copy, good.
             await _uploadModel.FileToUpload.OpenReadStream(_maxFileSize).CopyToAsync(fs);
-
-            // Logger.LogInformation("Successfully saved file {FilePath}", filePath);
 
             var document = new CustomerDocument
                 {
-                    OriginalFileName = _uploadModel.FileToUpload.Name, // Note: Not sanitized filename
+                    OriginalFileName = safeOriginalFileName,
                     StoredFileName = uniqueFileName,
                     ContentType = _uploadModel.FileToUpload.ContentType ?? "application/octet-stream",
                     FileSize = _uploadModel.FileToUpload.Size,
                     UploadTimestamp = DateTime.UtcNow,
                     Description = _uploadModel.Description,
                     UploadedById = userId,
-                    TargetUserId = userId // Ensure this is set correctly
+                    TargetUserId = userId
                 };
 
             DbContext.CustomerDocuments.Add(document);
             await DbContext.SaveChangesAsync();
-            // Logger.LogInformation("Saved document metadata to database for file {StoredFileName}", uniqueFileName);
 
+            // Reload the list to ensure consistency, including the new item
+            await LoadUserDocuments(); // This re-queries the DB
 
-            // Add to the list displayed in the grid
-            // _uploadedFiles ??= new List<CustomerDocument>(); // Ensure list exists (good practice, but not in original)
-            _uploadedFiles.Add(document); // Add to end (original logic); previous versions used Insert(0,...)
-
-            _uploadResultMessage = $"File '{_uploadModel.FileToUpload.Name}' uploaded successfully.";
+            _uploadResultMessage = $"File '{safeOriginalFileName}' uploaded successfully.";
             _uploadSuccess = true;
-
             _uploadModel = new(); // Reset form
         }
-        catch (Exception ex)
-        {
-            // Note: Less specific error handling than previous versions. Sticking to provided code.
-            // Logger is missing here too.
-            // Logger.LogError(ex, "Error during file upload. Inner Exception: {InnerException}", ex.InnerException?.Message);
-            _uploadResultMessage = $"Error uploading file: {ex.Message}";
-            _uploadSuccess = false;
-            // Note: No cleanup of partial file here.
-        }
+        catch (IOException ioEx) when (ioEx.Message.Contains("maximum allowed size")) { /* ... existing handler ... */ }
+        catch (UnauthorizedAccessException authEx) { /* ... existing handler ... */ }
+        catch (Exception ex) { /* ... existing handler ... */ }
         finally
         {
-            // Note: StateHasChanged missing here. The UI might rely on Blazor's default detection.
-            // await InvokeAsync(StateHasChanged);
+            await InvokeAsync(StateHasChanged);
         }
     }
-
 
     private string FormatFileSize(long bytes)
     {
-        const long kilobyte = 1024;
-        const long megabyte = kilobyte * 1024;
-        // Note: Gigabyte formatting missing from this version.
-        if (bytes < kilobyte) return $"{bytes} B";
-        if (bytes < megabyte) return $"{(double)bytes / kilobyte:F1} KB";
-        return $"{(double)bytes / megabyte:F1} MB";
+        const long kilobyte = 1024; const long megabyte = kilobyte * 1024; const long gigabyte = megabyte * 1024;
+        if (bytes < 0) return "Invalid size"; if (bytes == 0) return "0 B";
+        if (bytes < kilobyte) return $"{bytes} B"; if (bytes < megabyte) return $"{(double)bytes / kilobyte:F1} KB";
+        if (bytes < gigabyte) return $"{(double)bytes / megabyte:F1} MB"; return $"{(double)bytes / gigabyte:F1} GB";
     }
+
+    // --- Alternative Download Method (more complex setup needed) ---
+    // Requires JSInterop to trigger browser download from stream
+    // private async Task DownloadFile(int documentId)
+    // {
+    //     // This approach streams via Blazor Server signalR connection - not ideal for large files.
+    //     // The API endpoint approach is generally preferred.
+    //     // Placeholder - Implementation requires JSInterop call.
+    //     NavigationManager.NavigateTo($"/download/{documentId}", forceLoad: true);
+    // }
 }

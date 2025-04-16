@@ -9,11 +9,15 @@ using LehmanCustomConstruction.Data.Blogs.Interfaces;
 using LehmanCustomConstruction.Data.Blogs.Repository;
 using LehmanCustomConstruction.Data.Interfaces;
 using LehmanCustomConstruction.Data.Repositories;
-using LehmanCustomConstruction.Data.Common; // Namespace for EmailSettings
+using LehmanCustomConstruction.Data.Common; // Namespace for EmailSettings AND CustomerDocument
 using LehmanCustomConstruction.Services.Interfaces; // Namespace for IEmailService
 using LehmanCustomConstruction.Services; // Namespace for EmailService
 // using LehmanCustomConstruction.Services; // Add when IntuitService is needed
 using Radzen;
+using System.Security.Claims; // Added for ClaimTypes
+using Microsoft.Extensions.Configuration; // Added for IConfiguration access in endpoint
+using Microsoft.Extensions.Logging; // Added for ILogger access in endpoint
+using System.IO; // Added for Path operations
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -28,7 +32,7 @@ builder.Services.AddScoped<IdentityRedirectManager>(); // Keep for non-interacti
 builder.Services.AddScoped<AuthenticationStateProvider, IdentityRevalidatingAuthenticationStateProvider>();
 
 // --- HttpContextAccessor ---
-builder.Services.AddHttpContextAccessor(); // Needed by some services, like StatusMessage cookie handling
+builder.Services.AddHttpContextAccessor(); // Needed by some services, like StatusMessage cookie handling AND our download endpoint
 
 // --- Bind EmailSettings Configuration ---
 builder.Services.Configure<EmailSettings>(builder.Configuration.GetSection("EmailSettings"));
@@ -77,7 +81,7 @@ builder.Services.AddRadzenComponents();
 // --- HttpClient for Intuit API (Uncomment and configure when needed) ---
 // builder.Services.AddHttpClient("IntuitAPI", client =>
 // {
-//     client.BaseAddress = new Uri("https://sandbox-quickbooks.api.intuit.com/");
+//    client.BaseAddress = new Uri("https://sandbox-quickbooks.api.intuit.com/");
 // });
 
 
@@ -101,7 +105,7 @@ app.UseStaticFiles();
 app.UseAntiforgery();
 
 // --- Authentication & Authorization Middleware ---
-// Ensure these are active and in the correct order
+// Ensure these are active and in the correct order (before endpoint mapping)
 app.UseAuthentication();
 app.UseAuthorization();
 // --- End Auth ---
@@ -114,6 +118,87 @@ app.MapRazorComponents<App>()
 // Ensure this is active to handle the POST from Login.razor
 app.MapAdditionalIdentityEndpoints();
 // --- End Identity Endpoints ---
+
+// --- Add the Download Minimal API Endpoint ---
+// **********************************************
+// ** START: File Download Endpoint Definition **
+// **********************************************
+app.MapGet("/download/{id:int}", async (
+    int id,
+    HttpContext httpContext, // Access HttpContext directly
+    ApplicationDbContext dbContext,
+    IConfiguration configuration, // Inject IConfiguration
+    ILogger<Program> logger) => // Inject logger (using Program as category)
+{
+    // 1. Check Authentication
+    if (!(httpContext.User.Identity?.IsAuthenticated ?? false))
+    {
+        logger.LogWarning("Download attempt for ID {DocumentId} by unauthenticated user.", id);
+        return Results.Unauthorized();
+    }
+
+    // 2. Get User ID
+    var userId = httpContext.User.FindFirstValue(ClaimTypes.NameIdentifier);
+    if (userId == null)
+    {
+        logger.LogError("Download failed for ID {DocumentId}: Could not determine user identity for authenticated user.", id);
+        return Results.Forbid(); // Or BadRequest
+    }
+
+    // 3. Retrieve Document Metadata from DB
+    var document = await dbContext.CustomerDocuments.FindAsync(id);
+    if (document == null)
+    {
+        logger.LogWarning("Download attempt failed: Document with ID {DocumentId} not found.", id);
+        return Results.NotFound($"Document with ID {id} not found.");
+    }
+
+    // 4. IMPORTANT: Authorization Check - Does this user OWN the document?
+    //    (Adjust this logic based on your requirements - e.g., allow admins, check TargetUserId?)
+    //    Current logic: User must be the one who uploaded OR the target user.
+    if (document.UploadedById != userId && document.TargetUserId != userId /*&& !httpContext.User.IsInRole("Admin")*/ )
+    {
+        logger.LogWarning("Forbidden download attempt for ID {DocumentId} by user {UserId}. Document owner: {OwnerId}, Target: {TargetId}",
+           id, userId, document.UploadedById, document.TargetUserId);
+        return Results.Forbid(); // User does not have permission
+    }
+
+    // 5. Construct File Path
+    var basePath = configuration["FileUploadSettings:BasePath"]; // Read from config
+    if (string.IsNullOrWhiteSpace(basePath))
+    {
+        logger.LogError("Download failed for ID {DocumentId}: FileUploadSettings:BasePath is not configured.", id);
+        return Results.Problem("Server configuration error: Upload path not set.");
+    }
+    // Use UploadedById for the subfolder, matching the upload logic
+    var filePath = Path.Combine(basePath, document.UploadedById, document.StoredFileName);
+
+    // Basic check to prevent path traversal using StoredFileName (should be GUID anyway)
+    if (document.StoredFileName.Contains("..") || document.StoredFileName.IndexOfAny(Path.GetInvalidFileNameChars()) != -1)
+    {
+        logger.LogError("Download failed for ID {DocumentId}: Invalid characters in stored filename '{StoredFileName}'.", id, document.StoredFileName);
+        return Results.BadRequest("Invalid filename.");
+    }
+
+    // 6. Check if File Exists
+    if (!File.Exists(filePath))
+    {
+        logger.LogError("Download failed for ID {DocumentId}: File not found at physical path {FilePath}. StoredFileName: {StoredFileName}",
+            id, filePath, document.StoredFileName);
+        return Results.NotFound($"File associated with document ID {id} not found on server.");
+    }
+
+    // 7. Return the File
+    logger.LogInformation("Serving file for Document ID {DocumentId} to user {UserId}. Path: {FilePath}", id, userId, filePath);
+    // Returns the file stream. Browser will handle the download dialog.
+    // Provide the original filename so the user sees the correct name when saving.
+    return Results.File(filePath, document.ContentType ?? "application/octet-stream", document.OriginalFileName);
+
+}).RequireAuthorization(); // Ensures only logged-in users can even hit the endpoint
+// ********************************************
+// ** END: File Download Endpoint Definition **
+// ********************************************
+
 
 // Add custom API controller endpoints here later if needed
 // app.MapControllers();
