@@ -1,23 +1,23 @@
-﻿@page "/portal/documents-demo" // Demo route
-@layout PortalLayout // Using PortalLayout for structure, assuming it doesn't crash without auth
+﻿@page "/portal/documents-demo2"
+@layout PortalLayout
 
-@* No [Authorize] attribute *@
 @inject NavigationManager NavigationManager
 @inject IConfiguration Configuration
-@inject ILogger<DocumentsPage> Logger // Make sure type name matches file if renamed
+@inject ILogger<DocumentsPage> Logger
+@inject ApplicationDbContext DbContext
 
 @using Microsoft.AspNetCore.Components.Forms
 @using System.IO
 @using System.ComponentModel.DataAnnotations
+@using LehmanCustomConstruction.Data.Common
+@using Microsoft.EntityFrameworkCore
 
-<PageTitle>Demo Documents | Lehman Custom Construction</PageTitle>
+<PageTitle>Document Upload | Lehman Custom Construction</PageTitle>
 
-<h3 class="text-2xl font-semibold text-primary mb-6 font-serif">Demo Document Upload</h3>
-<p class="mb-4 text-orange-600 font-medium">Note: This is a demo page. Authentication and database saving are disabled.</p>
+<h3 class="text-2xl font-semibold text-primary mb-6 font-serif">Document Upload</h3>
 
-@* --- Upload Form Section --- *@
 <div class="bg-white border border-subtle rounded-lg shadow-sm p-6 mb-8">
-    <h4 class="text-xl font-semibold text-primary mb-4 font-serif">Upload New Document (Demo)</h4>
+    <h4 class="text-xl font-semibold text-primary mb-4 font-serif">Upload New Document</h4>
 
     @if (!string.IsNullOrEmpty(_uploadResultMessage))
     {
@@ -26,14 +26,14 @@
         </div>
     }
 
-    @* --- EditForm provides validation context and component model binding --- *@
-    <EditForm Model="_newDocumentModel" FormName="UploadDocumentFormDemo">
+    <EditForm Model="_newDocumentModel" OnValidSubmit="HandleFileUpload">
         <DataAnnotationsValidator />
+        <ValidationSummary />
 
         <div class="mb-4">
-            <label for="documentFileDemo" class="block text-sm font-medium text-gray-700 mb-1">Select File</label>
-            <InputFile id="documentFileDemo" OnChange="LoadFile" class="block w-full text-sm text-gray-900 border border-gray-300 rounded-lg cursor-pointer bg-gray-50 focus:outline-none" aria-describedby="file_input_help_demo" />
-            <p class="mt-1 text-sm text-gray-500" id="file_input_help_demo">Max file size: @_maxFileSizeMB MB. Allowed types: PDF, DOC, DOCX, JPG, PNG, HEIC.</p>
+            <label for="documentFile" class="block text-sm font-medium text-gray-700 mb-1">Select File</label>
+            <InputFile id="documentFile" OnChange="HandleFileSelected" class="block w-full text-sm text-gray-900 border border-gray-300 rounded-lg cursor-pointer bg-gray-50 focus:outline-none" aria-describedby="file_input_help" />
+            <p class="mt-1 text-sm text-gray-500" id="file_input_help">Max file size: @_maxFileSizeMB MB. Allowed types: PDF, DOC, DOCX, JPG, PNG, HEIC.</p>
             <ValidationMessage For="@(() => _newDocumentModel.BrowserFile)" />
             @if (_isFileLoading)
             {
@@ -42,13 +42,12 @@
         </div>
 
         <div class="mb-4">
-            <label for="descriptionDemo" class="block text-sm font-medium text-gray-700 mb-1">Description (Optional)</label>
-            <InputText id="descriptionDemo" @bind-Value="_newDocumentModel.Description" class="block w-full border-gray-300 rounded-md shadow-sm focus:ring-accent focus:border-accent sm:text-sm" placeholder="E.g., Demo Plans v1" />
+            <label for="description" class="block text-sm font-medium text-gray-700 mb-1">Description (Optional)</label>
+            <InputText id="description" @bind-Value="_newDocumentModel.Description" class="block w-full border-gray-300 rounded-md shadow-sm focus:ring-accent focus:border-accent sm:text-sm" placeholder="E.g., Renovation Plans v1" />
             <ValidationMessage For="@(() => _newDocumentModel.Description)" />
         </div>
 
-        @* --- Button uses @onclick, NOT type="submit" for the EditForm in this demo --- *@
-        <button type="button" @onclick="HandleFileSelectedDemo" disabled="@_isUploading || _isFileLoading" class="inline-flex items-center px-4 py-2 bg-primary border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-primary-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary disabled:opacity-50 disabled:cursor-not-allowed">
+        <button type="submit" disabled="@_isUploading || _isFileLoading" class="inline-flex items-center px-4 py-2 bg-primary border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-primary-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary disabled:opacity-50 disabled:cursor-not-allowed">
             @if (_isUploading)
             {
                 <svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -59,17 +58,53 @@
             }
             else
             {
-                <span>Upload Document (Demo)</span>
+                <span>Upload Document</span>
             }
         </button>
-
     </EditForm>
 </div>
 
-@* --- List of Uploaded Documents Section (Disabled) --- *@
 <div class="bg-white border border-subtle rounded-lg shadow-sm p-6">
     <h4 class="text-xl font-semibold text-primary mb-4 font-serif">Uploaded Documents</h4>
-    <p class="text-secondary italic">Document listing is disabled in demo mode.</p>
+
+    @if (_userDocuments == null && _loadDocumentsError == null)
+    {
+        <p class="text-secondary">Loading documents...</p>
+    }
+    else if (!string.IsNullOrEmpty(_loadDocumentsError))
+    {
+        <p class="text-red-600">Error loading documents: @_loadDocumentsError</p>
+    }
+    else if (_userDocuments != null && !_userDocuments.Any())
+    {
+        <p class="text-secondary">You haven't uploaded any documents yet.</p>
+    }
+    else if (_userDocuments != null)
+    {
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">File Name</th>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Description</th>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Uploaded On</th>
+                        <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Size</th>
+                    </tr>
+                </thead>
+                <tbody class="bg-white divide-y divide-gray-200">
+                    @foreach (var doc in _userDocuments)
+                    {
+                        <tr>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">@doc.OriginalFileName</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">@(doc.Description ?? "-")</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">@doc.UploadTimestamp.ToLocalTime().ToString("yyyy-MM-dd HH:mm")</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">@FormatFileSize(doc.FileSize)</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
 </div>
 
 @code {
@@ -78,10 +113,13 @@
     private bool _isFileLoading = false;
     private string? _uploadResultMessage;
     private bool _uploadSuccess = false;
+
+    private List<CustomerDocument>? _userDocuments;
+    private string? _loadDocumentsError;
+
     private long _maxFileSize = 20 * 1024 * 1024;
     private int _maxFileSizeMB = 20;
-
-    private readonly string[] _allowedExtensions = [".pdf", ".doc", ".docx", ".jpg", ".jpeg", ".png", ".heic"];
+    private readonly string[] _allowedExtensions = { ".pdf", ".doc", ".docx", ".jpg", ".jpeg", ".png", ".heic" };
 
     private class NewDocumentModel
     {
@@ -92,143 +130,91 @@
         public string? Description { get; set; }
     }
 
-    protected override void OnInitialized()
+    protected override async Task OnInitializedAsync()
     {
-        if (int.TryParse(Configuration["FileStorageSettings:MaxFileSizeMB"], out int configMaxMb) && configMaxMb > 0)
-        {
-            _maxFileSizeMB = configMaxMb;
-            _maxFileSize = _maxFileSizeMB * 1024L * 1024L;
-        }
-        else
-        {
-            Logger.LogWarning("MaxFileSizeMB config missing/invalid. Using default: {Size}MB", _maxFileSizeMB);
-        }
-    }
-
-    private async Task LoadFile(InputFileChangeEventArgs e)
-    {
-        _isFileLoading = true;
-        _uploadResultMessage = null;
-        _newDocumentModel.BrowserFile = null; // Clear previous file selection
-        Logger.LogInformation("LoadFile started. _isFileLoading set to true.");
-        await InvokeAsync(StateHasChanged); // Update UI to show loading indicator
-
         try
         {
-            _newDocumentModel.BrowserFile = e.File; // Assign the new file
-            if (_newDocumentModel.BrowserFile == null)
-            {
-                Logger.LogWarning("InputFileChangeEventArgs provided a null file.");
-                _uploadResultMessage = "Could not read the selected file.";
-                _uploadSuccess = false;
-            }
-            else
-            {
-                Logger.LogInformation("BrowserFile assigned: {Name}, Size: {Size}", _newDocumentModel.BrowserFile.Name, _newDocumentModel.BrowserFile.Size);
-                // Optional: Force validation update if needed
-                var editContext = new EditContext(_newDocumentModel);
-                editContext.NotifyFieldChanged(FieldIdentifier.Create(() => _newDocumentModel.BrowserFile));
-                editContext.Validate();
-            }
+            _userDocuments = await DbContext.CustomerDocuments
+                .OrderByDescending(d => d.UploadTimestamp)
+                .ToListAsync();
         }
         catch (Exception ex)
         {
-            Logger.LogError(ex, "Error loading file from InputFileChangeEventArgs");
-            _uploadResultMessage = $"Error reading file properties: {ex.Message}";
-            _uploadSuccess = false;
+            Logger.LogError(ex, "Error loading documents.");
+            _loadDocumentsError = "An error occurred while loading documents.";
+        }
+    }
+
+    private async Task HandleFileSelected(InputFileChangeEventArgs e)
+    {
+        _isFileLoading = true;
+        _uploadResultMessage = null;
+
+        try
+        {
+            _newDocumentModel.BrowserFile = e.File;
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error selecting file.");
+            _uploadResultMessage = "Error selecting file.";
         }
         finally
         {
-            _isFileLoading = false; // Loading finished
-            Logger.LogInformation("_isFileLoading set to false.");
-            await InvokeAsync(StateHasChanged); // Update UI (hide loading, potentially enable button)
-            Logger.LogInformation("StateHasChanged called in LoadFile finally block.");
+            _isFileLoading = false;
         }
-        Logger.LogInformation("LoadFile finished.");
     }
 
-
-    // Demo file handling triggered by @onclick
-    private async Task HandleFileSelectedDemo()
+    private async Task HandleFileUpload()
     {
-        Logger.LogInformation(">>> HandleFileSelectedDemo method started via @onclick <<<");
-
         if (_newDocumentModel.BrowserFile == null)
         {
-            _uploadResultMessage = "Please select a file first.";
-            _uploadSuccess = false;
-            Logger.LogWarning("HandleFileSelectedDemo - No file selected.");
-            await InvokeAsync(StateHasChanged); // Show error message
-            return;
-        }
-
-        string? validationError = ValidateFile(_newDocumentModel.BrowserFile);
-        if (validationError != null)
-        {
-            _uploadResultMessage = validationError;
-            _uploadSuccess = false;
-            Logger.LogWarning("File validation failed in HandleFileSelectedDemo: {Error}", validationError);
-            await InvokeAsync(StateHasChanged); // Show validation error
+            _uploadResultMessage = "Please select a file.";
             return;
         }
 
         _isUploading = true;
         _uploadResultMessage = null;
-        await InvokeAsync(StateHasChanged); // Show spinner
 
         try
         {
-            Logger.LogInformation("Simulating upload for file {Name}", _newDocumentModel.BrowserFile.Name);
-            await Task.Delay(1500); // Simulate network delay
+            string fileName = $"{Guid.NewGuid()}{Path.GetExtension(_newDocumentModel.BrowserFile.Name)}";
+            string filePath = Path.Combine(Configuration["FileStorageSettings:UploadBasePath"], fileName);
+
+            await using FileStream fs = new(filePath, FileMode.Create);
+            await _newDocumentModel.BrowserFile.OpenReadStream(_maxFileSize).CopyToAsync(fs);
+
+            var document = new CustomerDocument
+                {
+                    OriginalFileName = _newDocumentModel.BrowserFile.Name,
+                    StoredFileName = fileName,
+                    FileSize = _newDocumentModel.BrowserFile.Size,
+                    UploadTimestamp = DateTime.UtcNow,
+                    Description = _newDocumentModel.Description
+                };
+
+            DbContext.CustomerDocuments.Add(document);
+            await DbContext.SaveChangesAsync();
 
             _uploadSuccess = true;
-            _uploadResultMessage = $"Demo: File '{_newDocumentModel.BrowserFile.Name}' would have been uploaded successfully!";
-            Logger.LogInformation("Demo upload simulation successful for {Name}", _newDocumentModel.BrowserFile.Name);
-
-            // Reset the form model after simulated success
-            _newDocumentModel = new();
-
+            _uploadResultMessage = "File uploaded successfully.";
+            _userDocuments?.Insert(0, document);
         }
         catch (Exception ex)
         {
-            Logger.LogError(ex, "Unexpected error during demo upload simulation for {Name}", _newDocumentModel.BrowserFile?.Name);
-            _uploadSuccess = false;
-            _uploadResultMessage = "An unexpected error occurred during the demo upload simulation.";
+            Logger.LogError(ex, "Error uploading file.");
+            _uploadResultMessage = "Error uploading file.";
         }
         finally
         {
             _isUploading = false;
-            Logger.LogInformation("HandleFileSelectedDemo finished. _isUploading set to false.");
-            // Let StateHasChanged in the try/catch update the UI
-            await InvokeAsync(StateHasChanged);
         }
     }
 
-    private string? ValidateFile(IBrowserFile? file)
-    {
-        if (file == null) return "Please select a file.";
-        if (file.Size == 0) return "Cannot upload an empty file.";
-        if (file.Size > _maxFileSize) return $"File size exceeds the limit of {_maxFileSizeMB} MB.";
-
-        var fileExtension = Path.GetExtension(file.Name)?.ToLowerInvariant();
-        if (string.IsNullOrEmpty(fileExtension) || !_allowedExtensions.Contains(fileExtension))
-        {
-            return $"Invalid file type. Allowed types: {string.Join(", ", _allowedExtensions)}";
-        }
-        return null; // File is valid
-    }
-
-    // Corrected FormatFileSize
     private string FormatFileSize(long bytes)
     {
-        const long kilobyte = 1024;
-        const long megabyte = kilobyte * 1024;
-        const long gigabyte = megabyte * 1024;
-
-        if (bytes == 0) return "0 B";
-        if (bytes < kilobyte) return $"{bytes} B";
-        if (bytes < megabyte) return $"{(double)bytes / kilobyte:F1} KB";
-        if (bytes < gigabyte) return $"{(double)bytes / megabyte:F1} MB";
-        return $"{(double)bytes / gigabyte:F1} GB"; // This ensures all paths return
+        if (bytes < 1024) return $"{bytes} B";
+        if (bytes < 1024 * 1024) return $"{bytes / 1024.0:F1} KB";
+        return $"{bytes / (1024.0 * 1024.0):F1} MB";
     }
 }
