@@ -1,0 +1,255 @@
+﻿@page "/admin/customer-documents/{CustomerId}" 
+@layout AdminLayout // Use the admin layout
+
+@inject ApplicationDbContext DbContext
+@* --- Corrected Logger Injection (assuming file is named CustomerDocumentsAdmin.razor) --- *@
+@inject ILogger<CustomerDocumentsAdmin> Logger
+@inject NavigationManager NavigationManager
+@inject DialogService DialogService // Inject DialogService for confirmation dialogs
+@inject IConfiguration Configuration
+@using LehmanCustomConstruction.Data 
+@using LehmanCustomConstruction.Data.Common
+@using Microsoft.AspNetCore.Identity
+@using Microsoft.EntityFrameworkCore
+@using Radzen
+@using Radzen.Blazor
+
+<PageTitle>Manage Documents for Customer</PageTitle>
+
+@if (_isLoading)
+{
+    <p><em>Loading customer details...</em></p>
+}
+else if (_customer == null)
+{
+    <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mb-4" role="alert">
+        <span class="block sm:inline">Error: Customer with ID '@CustomerId' not found.</span>
+        <button @onclick='() => NavigationManager.NavigateTo("/admin/customers")' class="ml-4 px-2 py-1 bg-primary text-white text-xs rounded">Back to Customers</button>
+    </div>
+}
+else
+{
+    <h3 class="text-2xl font-semibold text-primary mb-2 font-serif">Manage Documents for: @_customer.UserName</h3>
+    <p class="text-secondary mb-6">ID: @_customer.Id | Email: @_customer.Email</p>
+
+    @* --- Admin Upload Section (Placeholder) --- *@
+    <div class="bg-white border border-subtle rounded-lg shadow-sm p-6 mb-8">
+        <h4 class="text-xl font-semibold text-primary mb-4 font-serif">Upload Document for Customer</h4>
+        @* TODO: Add an upload component here - similar to Document_demo.razor *@
+        @* BUT: Ensure TargetUserId is set to CustomerId and potentially track Admin Uploader ID *@
+        <p class="text-secondary italic">Admin upload functionality coming soon...</p>
+        @* --- Display Upload Messages --- *@
+        @if (!string.IsNullOrEmpty(_uploadResultMessage))
+        {
+            <div class="@(_uploadSuccess ? "mt-4 bg-green-100 border border-green-400 text-green-700" : "mt-4 bg-red-100 border border-red-400 text-red-700") px-4 py-3 rounded relative" role="alert">
+                <span class="block sm:inline">@_uploadResultMessage</span>
+            </div>
+        }
+    </div>
+    @* --- End Admin Upload Section --- *@
+
+
+    @* --- Existing Documents Grid --- *@
+    <div class="bg-white border border-subtle rounded-lg shadow-sm p-6">
+        <h4 class="text-xl font-semibold text-primary mb-4 font-serif">Existing Documents</h4>
+
+        @* --- Replaced ul with RadzenDataGrid --- *@
+        <RadzenDataGrid Data="@_documents" TItem="CustomerDocument" AllowSorting="true" AllowPaging="true" PageSize="10"
+                        PagerHorizontalAlign="HorizontalAlign.Left" ShowPagingSummary="true" AllowFiltering="true" FilterCaseSensitivity="FilterCaseSensitivity.CaseInsensitive"
+                        Density="Density.Compact" Style="width: 100%;" EmptyText="No documents found for this customer." IsLoading="@_isLoadingDocuments">
+            <Columns>
+                <RadzenDataGridColumn TItem="CustomerDocument" Property="OriginalFileName" Title="File Name" Width="250px" />
+
+                <RadzenDataGridColumn TItem="CustomerDocument" Property="UploadTimestamp" Title="Uploaded On" FormatString="{0:yyyy-MM-dd HH:mm}" Width="160px" TextAlign="TextAlign.Center" />
+
+                <RadzenDataGridColumn TItem="CustomerDocument" Title="Size" Property="FileSize" Sortable="true" Filterable="false" Width="100px" TextAlign="TextAlign.Right">
+                    <Template Context="doc">
+                        @FormatFileSize(doc.FileSize)
+                    </Template>
+                </RadzenDataGridColumn>
+
+                <RadzenDataGridColumn TItem="CustomerDocument" Property="Description" Title="Description" Width="200px" />
+
+                @* --- Optional: Show who uploaded it (if needed) ---
+                 <RadzenDataGridColumn TItem="CustomerDocument" Title="Uploaded By" Width="150px">
+                    <Template Context="doc">
+                        @* You might need to include User data to show names instead of IDs *@
+                @* @doc.UploadedBy?.UserName ?? doc.UploadedById *@
+                @* For now, just the ID * @
+                         <span class="text-xs">@doc.UploadedById</span>
+                    </Template>
+                 </RadzenDataGridColumn>
+                 *@
+
+                <RadzenDataGridColumn TItem="CustomerDocument" Title="Actions" Sortable="false" Filterable="false" Width="150px" TextAlign="TextAlign.Center">
+                    <Template Context="doc">
+                        @* Direct Download Link *@
+                        <RadzenButton ButtonStyle="ButtonStyle.Success" Icon="download" Size="ButtonSize.Small"
+                                      Click=@(() => NavigationManager.NavigateTo($"/download/{doc.Id}", forceLoad: true)) Text="Download" class="mr-1" />
+
+                        @* Delete Button *@
+                        <RadzenButton ButtonStyle="ButtonStyle.Danger" Icon="delete" Size="ButtonSize.Small"
+                                      Click=@(args => ConfirmDeleteDocument(doc)) Text="Delete" />
+                    </Template>
+                </RadzenDataGridColumn>
+            </Columns>
+        </RadzenDataGrid>
+        @* --- End RadzenDataGrid --- *@
+    </div>
+}
+
+
+@code {
+    [Parameter]
+    public string CustomerId { get; set; } = string.Empty;
+
+    private ApplicationUser? _customer;
+    private List<CustomerDocument>? _documents;
+    private bool _isLoading = true; // For overall page load
+    private bool _isLoadingDocuments = false; // Specifically for grid refresh
+
+    // --- For Upload Section ---
+    private string? _uploadResultMessage;
+    private bool _uploadSuccess;
+    // TODO: Add Upload Model and Handlers here later
+
+
+    protected override async Task OnParametersSetAsync()
+    {
+        await LoadCustomerData();
+    }
+
+    private async Task LoadCustomerData()
+    {
+        _isLoading = true; // Start overall loading
+        _isLoadingDocuments = true; // Start grid loading
+        if (string.IsNullOrEmpty(CustomerId))
+        {
+            Logger.LogWarning("Customer ID parameter is missing.");
+            _customer = null;
+            _isLoading = false;
+            _isLoadingDocuments = false;
+            return;
+        }
+
+        try
+        {
+            _customer = await DbContext.Users.FirstOrDefaultAsync(u => u.Id == CustomerId);
+
+            if (_customer != null)
+            {
+                // Fetch documents where this customer is the target
+                _documents = await DbContext.CustomerDocuments
+                                            .Where(d => d.TargetUserId == CustomerId)
+                                            .OrderByDescending(d => d.UploadTimestamp)
+                                            .AsNoTracking()
+                                            .ToListAsync();
+                Logger.LogInformation("Loaded details and {DocCount} documents for customer {CustomerId}", _documents?.Count ?? 0, CustomerId);
+            }
+            else
+            {
+                Logger.LogWarning("Customer with ID {CustomerId} not found in the database.", CustomerId);
+                _documents = new List<CustomerDocument>();
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error loading data for customer {CustomerId}", CustomerId);
+            _customer = null;
+            _documents = null;
+            // Display error to user?
+        }
+        finally
+        {
+            _isLoading = false; // Finish overall loading
+            _isLoadingDocuments = false; // Finish grid loading
+            await InvokeAsync(StateHasChanged); // Ensure UI updates after async load
+        }
+    }
+
+    private string FormatFileSize(long bytes)
+    {
+        const long kilobyte = 1024; const long megabyte = kilobyte * 1024; const long gigabyte = megabyte * 1024;
+        if (bytes < 0) return "Invalid size"; if (bytes == 0) return "0 B";
+        if (bytes < kilobyte) return $"{bytes} B"; if (bytes < megabyte) return $"{(double)bytes / kilobyte:F1} KB";
+        if (bytes < gigabyte) return $"{(double)bytes / megabyte:F1} MB"; return $"{(double)bytes / gigabyte:F1} GB";
+    }
+
+    // --- Document Deletion Logic ---
+    private async Task ConfirmDeleteDocument(CustomerDocument docToDelete)
+    {
+        if (docToDelete == null) return;
+
+        var result = await DialogService.Confirm(
+            $"Are you sure you want to delete the file '{docToDelete.OriginalFileName}'?",
+            "Confirm Deletion",
+            new ConfirmOptions() { OkButtonText = "Yes, Delete", CancelButtonText = "Cancel" });
+
+        if (result == true) // User confirmed
+        {
+            await DeleteDocument(docToDelete);
+        }
+    }
+
+    private async Task DeleteDocument(CustomerDocument docToDelete)
+    {
+        _isLoadingDocuments = true; // Show loading state on grid
+        await InvokeAsync(StateHasChanged);
+
+        try
+        {
+            // 1. Find the document record in the context (important if instance came from AsNoTracking list)
+            var trackedDoc = await DbContext.CustomerDocuments.FindAsync(docToDelete.Id);
+            if (trackedDoc == null)
+            {
+                Logger.LogWarning("Attempted to delete document ID {DocumentId} but it was not found in DB.", docToDelete.Id);
+                _uploadResultMessage = "Error: Document not found.";
+                _uploadSuccess = false;
+                return;
+            }
+
+            // 2. Construct the file path
+            string baseDir = Configuration["FileUploadSettings:BasePath"] ?? string.Empty; // Get base path
+            string userDir = Path.Combine(baseDir, trackedDoc.TargetUserId ?? string.Empty); // Use TargetUserId for customer folder
+            string filePath = Path.Combine(userDir, trackedDoc.StoredFileName);
+
+            // 3. Delete the database record FIRST (safer in case file deletion fails)
+            DbContext.CustomerDocuments.Remove(trackedDoc);
+            await DbContext.SaveChangesAsync();
+            Logger.LogInformation("Successfully deleted database record for document ID {DocumentId}, File: {FileName}", trackedDoc.Id, trackedDoc.OriginalFileName);
+
+
+            // 4. Delete the physical file
+            if (File.Exists(filePath))
+            {
+                File.Delete(filePath);
+                Logger.LogInformation("Successfully deleted physical file: {FilePath}", filePath);
+            }
+            else
+            {
+                Logger.LogWarning("Physical file not found during deletion: {FilePath}", filePath);
+                // Decide if this is an error or just a warning. Maybe the file was already gone.
+            }
+
+            // 5. Refresh the list
+            await LoadCustomerData(); // Reload all data to refresh the grid
+
+            _uploadResultMessage = $"Document '{trackedDoc.OriginalFileName}' deleted successfully.";
+            _uploadSuccess = true;
+
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error deleting document ID {DocumentId}", docToDelete.Id);
+            _uploadResultMessage = $"Error deleting document: {ex.Message}";
+            _uploadSuccess = false;
+        }
+        finally
+        {
+            _isLoadingDocuments = false; // Hide loading state
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    // --- TODO: Add methods for Admin Uploading documents ---
+}

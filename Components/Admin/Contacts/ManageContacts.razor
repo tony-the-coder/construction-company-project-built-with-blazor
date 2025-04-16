@@ -1,8 +1,8 @@
 ﻿@page "/admin/contacts"
 @layout AdminLayout
 
-@using LehmanCustomConstruction.Data.Common // For ContactInquiry, InquiryStatus
-@using LehmanCustomConstruction.Data.Interfaces // For IContactInquiryRepository
+@using LehmanCustomConstruction.Data.Common 
+@using LehmanCustomConstruction.Data.Interfaces 
 @using Radzen
 @using Radzen.Blazor
 
@@ -11,7 +11,7 @@
 @inject DialogService DialogService // For viewing details in a modal
 @inject NotificationService NotificationService // For status update feedback
 
-<h3 class="text-2xl font-semibold text-primary mb-6 font-serif">Contact Form Inquiries</h3>
+<h3 class="text-2xl font-semibold text-gray-100 mb-6 font-serif">Contact Form Inquiries</h3>
 
 @if (_isLoading && _inquiries == null)
 {

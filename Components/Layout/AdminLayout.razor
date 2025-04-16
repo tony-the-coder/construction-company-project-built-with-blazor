@@ -1,6 +1,6 @@
 ﻿@* File: Components/Layout/AdminLayout.razor *@
 @using Microsoft.AspNetCore.Components.Sections
-@using Microsoft.AspNetCore.Components.Authorization
+@*@using Microsoft.AspNetCore.Components.Authorization*@ @* Commented out for now *@
 
 @inherits LayoutComponentBase
 
@@ -22,13 +22,17 @@
             <p class="mt-2 text-sm font-semibold text-primary dark:text-gray-200">Admin Panel</p>
         </div>
 
-        <AuthorizeView>
+        @* <AuthorizeView> Commented out for now
             <Authorized>
                 <p class="mb-4 text-xs text-center text-secondary dark:text-gray-400">
                     Welcome, @context.User?.Identity?.Name!
                 </p>
             </Authorized>
-        </AuthorizeView>
+        </AuthorizeView> *@
+        <p class="mb-4 text-xs text-center text-secondary dark:text-gray-400">
+            Welcome, Admin! @* Placeholder *@
+        </p>
+
 
         <hr class="border-subtle dark:border-gray-600 my-2">
 
@@ -52,23 +56,25 @@
                 <span class="ml-3">Manage Categories</span>
             </NavLink>
 
-            @* <<< ADDED CONTACTS LINK HERE >>> *@
             <NavLink href="admin/contacts" Match="NavLinkMatch.Prefix"
                      class="flex items-center px-3 py-2 rounded-md text-sm font-medium text-primary dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
                      ActiveClass="bg-gray-100 dark:bg-gray-700 text-accent dark:text-accent font-semibold">
                 <span class="ml-3">Manage Contacts</span>
             </NavLink>
 
-            <NavLink href="admin/subscribers" Match="NavLinkMatch.Prefix"
+            @* --- MODIFIED LINK --- *@
+            <NavLink href="admin/customers" Match="NavLinkMatch.Prefix"
                      class="flex items-center px-3 py-2 rounded-md text-sm font-medium text-primary dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
                      ActiveClass="bg-gray-100 dark:bg-gray-700 text-accent dark:text-accent font-semibold">
-                <span class="ml-3">Manage Subscribers</span>
+                <span class="ml-3">Manage Customers</span> @* <-- Changed Text *@
             </NavLink>
+            @* --- END MODIFIED LINK --- *@
+
             @* Add other admin links here *@
         </nav>
 
         <div class="mt-auto pt-4 border-t border-subtle dark:border-gray-600">
-            <button @* @onclick="HandleLogout" *@
+            <button @* @onclick="HandleLogout" *@ @* Commented out for now *@
                     class="w-full flex items-center justify-center px-3 py-2 rounded-md text-sm font-medium text-red-700 dark:text-red-400 bg-red-100 dark:bg-red-900 hover:bg-red-200 dark:hover:bg-red-800">
                 Logout (Placeholder)
             </button>
@@ -85,7 +91,7 @@
 </div>
 
 @code {
-    // @inject AuthenticationStateProvider AuthenticationStateProvider
-    // @inject NavigationManager NavigationManager
-    // private async Task HandleLogout() { ... }
+    // @inject AuthenticationStateProvider AuthenticationStateProvider // Commented out for now
+    // @inject NavigationManager NavigationManager // Commented out for now
+    // private async Task HandleLogout() { ... } // Commented out for now
 }

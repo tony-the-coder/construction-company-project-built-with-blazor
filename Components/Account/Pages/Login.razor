@@ -2,81 +2,92 @@
 @rendermode InteractiveServer // Keep interactive for validation messages
 
 @using System.ComponentModel.DataAnnotations
-@using LehmanCustomConstruction.Components.Account.Shared
+@using LehmanCustomConstruction.Components.Account.Shared // Adjust if your StatusMessage is elsewhere
 @using Microsoft.AspNetCore.Authentication
 @using Microsoft.AspNetCore.Identity
-@using LehmanCustomConstruction.Data
+@using LehmanCustomConstruction.Data // Needed for ApplicationUser
 
 @inject SignInManager<ApplicationUser> SignInManager
+@inject UserManager<ApplicationUser> UserManager // <<< ADDED: Inject UserManager for user lookups
 @inject ILogger<Login> Logger
 @inject NavigationManager NavigationManager
 @inject IdentityRedirectManager RedirectManager
 
 <PageTitle>Log in</PageTitle>
 
-<h1>Log in</h1>
-<div class="row">
-    <div class="col-lg-6">
-        <section>
-            <StatusMessage Message="@errorMessage" />
+<div class="container mt-5">
+    @* Added container for better layout *@
+    <div class="row justify-content-center">
+        @* Center the content *@
+        <div class="col-md-8 col-lg-6">
+            @* Define column width *@
+            <h1 class="text-center mb-4">Log in</h1> @* Centered heading *@
 
-            @* --- Outer form handles the actual POST submission --- *@
-            <form method="post" @formname="login">
-                @* --- Antiforgery Token is ESSENTIAL for POST security --- *@
-                <AntiforgeryToken />
+            <section>
+                <StatusMessage Message="@errorMessage" />
 
-                @* --- Inner EditForm provides EditContext for VALIDATION ONLY --- *@
-                @* --- It does NOT handle the submit action itself --- *@
-                <EditForm Model="Input">
-                    <DataAnnotationsValidator /> @* Validator now has an EditContext *@
-                    <h2>Use a local account to log in.</h2>
-                    <hr />
-                    <ValidationSummary class="text-danger" role="alert" />
-                    <div class="form-floating mb-3">
-                        @* Inputs need 'name' for POST binding AND @bind for Blazor state/validation *@
-                        <InputText @bind-Value="Input.Email" name="Input.Email" id="Input.Email" class="form-control" autocomplete="username" aria-required="true" placeholder="name@example.com" />
-                        <label for="Input.Email" class="form-label">Email</label>
-                        <ValidationMessage For="() => Input.Email" class="text-danger" />
+                @* --- Outer form handles the actual POST submission --- *@
+                <form method="post" @formname="login">
+                    @* --- Antiforgery Token is ESSENTIAL for POST security --- *@
+                    <AntiforgeryToken />
+
+                    @* --- Inner EditForm provides EditContext for VALIDATION ONLY --- *@
+                    @* --- It does NOT handle the submit action itself --- *@
+                    <EditForm Model="Input">
+                        <DataAnnotationsValidator /> @* Validator now has an EditContext *@
+                        <h2 class="h5">Use a local account to log in.</h2>
+                        <hr />
+                        <ValidationSummary class="text-danger" role="alert" />
+                        <div class="form-floating mb-3">
+                            @* Inputs need 'name' for POST binding AND @bind for Blazor state/validation *@
+                            <InputText @bind-Value="Input.Email" name="Input.Email" id="Input.Email" class="form-control" autocomplete="username" aria-required="true" placeholder="name@example.com" />
+                            <label for="Input.Email" class="form-label">Email</label>
+                            <ValidationMessage For="() => Input.Email" class="text-danger" />
+                        </div>
+                        <div class="form-floating mb-3">
+                            <InputText type="password" @bind-Value="Input.Password" name="Input.Password" id="Input.Password" class="form-control" autocomplete="current-password" aria-required="true" placeholder="password" />
+                            <label for="Input.Password" class="form-label">Password</label>
+                            <ValidationMessage For="() => Input.Password" class="text-danger" />
+                        </div>
+                        <div class="checkbox mb-3">
+                            <label class="form-label">
+                                <InputCheckbox @bind-Value="Input.RememberMe" name="Input.RememberMe" class="darker-border-checkbox form-check-input" />
+                                Remember me
+                            </label>
+                        </div>
+                    </EditForm> @* --- End of inner EditForm --- *@
+
+                    @* --- Submit button belongs to the OUTER form --- *@
+                    <div class="mb-3">
+                        @* Added margin bottom *@
+                        <button type="submit" class="w-100 btn btn-lg btn-primary">Log in</button>
                     </div>
-                    <div class="form-floating mb-3">
-                        <InputText type="password" @bind-Value="Input.Password" name="Input.Password" id="Input.Password" class="form-control" autocomplete="current-password" aria-required="true" placeholder="password" />
-                        <label for="Input.Password" class="form-label">Password</label>
-                        <ValidationMessage For="() => Input.Password" class="text-danger" />
-                    </div>
-                    <div class="checkbox mb-3">
-                        <label class="form-label">
-                            <InputCheckbox @bind-Value="Input.RememberMe" name="Input.RememberMe" class="darker-border-checkbox form-check-input" />
-                            Remember me
-                        </label>
-                    </div>
-                </EditForm> @* --- End of inner EditForm --- *@
 
-                @* --- Submit button belongs to the OUTER form --- *@
-                <div>
-                    <button type="submit" class="w-100 btn btn-lg btn-primary">Log in</button>
-                </div>
+                    @* --- Other links remain inside the outer form --- *@
+                    <div class="text-center">
+                        @* Center links *@
+                        <p>
+                            <a href="Account/ForgotPassword">Forgot your password?</a>
+                        </p>
+                        <p>
+                            <a href="@(NavigationManager.GetUriWithQueryParameters("Account/Register", new Dictionary<string, object?> { ["ReturnUrl"] = ReturnUrl }))">Register as a new user</a>
+                        </p>
+                        <p>
+                            <a href="Account/ResendEmailConfirmation">Resend email confirmation</a>
+                        </p>
+                    </div>
+                </form> @* --- End of outer form --- *@
+            </section>
 
-                @* --- Other links remain inside the outer form --- *@
-                <div>
-                    <p>
-                        <a href="Account/ForgotPassword">Forgot your password?</a>
-                    </p>
-                    <p>
-                        <a href="@(NavigationManager.GetUriWithQueryParameters("Account/Register", new Dictionary<string, object?> { ["ReturnUrl"] = ReturnUrl }))">Register as a new user</a>
-                    </p>
-                    <p>
-                        <a href="Account/ResendEmailConfirmation">Resend email confirmation</a>
-                    </p>
-                </div>
-            </form> @* --- End of outer form --- *@
-        </section>
-    </div>
-    <div class="col-lg-4 col-lg-offset-2">
-        <section>
-            <h3>Use another service to log in.</h3>
-            <hr />
-            @* <ExternalLoginPicker @rendermode="InteractiveServer" /> *@
-        </section>
+            @* --- External Logins Section (Placeholder) --- *@
+            @* Uncomment if you implement external logins later
+            <section class="mt-4 pt-4 border-top">
+                <h3 class="h5 text-center">Use another service to log in.</h3>
+                <hr />
+                 <ExternalLoginPicker @rendermode="InteractiveServer" />
+            </section>
+            *@
+        </div>
     </div>
 </div>
 
@@ -92,51 +103,71 @@
     // --- The OnPostAsync handler does the actual login ---
     public async Task OnPostAsync()
     {
-        ReturnUrl ??= "~/";
-        Logger.LogInformation("OnPostAsync attempting login for {Email}", Input.Email);
+        ReturnUrl ??= "~/"; // Default to home page if no return URL
         errorMessage = null; // Clear previous errors
+        Logger.LogInformation("Login attempt started for {Email}", Input.Email);
 
-        // ModelState validation happens automatically based on InputModel attributes
-        // But you might want to check explicitly if needed:
-        // if (!ModelState.IsValid) { ... handle ... }
+        // Model validation using [Required] etc. happens before this method via DataAnnotationsValidator.
+        // The framework handles returning if the model state from the POST itself is invalid.
 
-        var result = await SignInManager.PasswordSignInAsync(Input.Email, Input.Password, Input.RememberMe, lockoutOnFailure: false);
+        var result = await SignInManager.PasswordSignInAsync(Input.Email, Input.Password, Input.RememberMe, lockoutOnFailure: false); // Consider lockoutOnFailure: true for production
 
         if (result.Succeeded)
         {
-            Logger.LogInformation("User logged in via OnPostAsync.");
+            Logger.LogInformation("User '{Email}' logged in successfully.", Input.Email);
             RedirectManager.RedirectTo(ReturnUrl);
-            return; // Prevent further rendering after redirect
+            return; // Exit immediately after redirect
         }
         if (result.RequiresTwoFactor)
         {
-            Logger.LogInformation("Login requires two-factor authentication.");
+            Logger.LogInformation("Login for '{Email}' requires two-factor authentication.", Input.Email);
             var queryParams = new Dictionary<string, object?> { ["returnUrl"] = ReturnUrl, ["rememberMe"] = Input.RememberMe };
             RedirectManager.RedirectTo("Account/LoginWith2fa", queryParams);
-            return; // Prevent further rendering
+            return; // Exit immediately
         }
         if (result.IsLockedOut)
         {
-            Logger.LogWarning("User account locked out.");
+            Logger.LogWarning("User account '{Email}' is locked out.", Input.Email);
             RedirectManager.RedirectTo("Account/Lockout");
-            return; // Prevent further rendering
+            return; // Exit immediately
         }
         else
         {
-            Logger.LogWarning("Invalid login attempt for {Email}.", Input.Email);
-            errorMessage = "Error: Invalid login attempt.";
-            // Let the component re-render to show the errorMessage
+            // --- Enhanced Error Handling ---
+            Logger.LogWarning("Invalid login attempt for {Email}. SignInResult: {ResultStatus}", Input.Email, result.ToString());
+
+            if (result.IsNotAllowed)
+            {
+                // Check if email confirmation is the specific issue
+                var user = await UserManager.FindByEmailAsync(Input.Email);
+                if (user != null && !await UserManager.IsEmailConfirmedAsync(user))
+                {
+                    Logger.LogWarning("Login failed for '{Email}': Email not confirmed.", Input.Email);
+                    errorMessage = "Error: Your email address needs to be confirmed. Check your inbox or resend confirmation.";
+                    // TODO: Optionally add a button/link here to trigger resend confirmation logic
+                }
+                else
+                {
+                    Logger.LogWarning("Login failed for '{Email}': Login is not allowed (may be disabled or other reason).", Input.Email);
+                    errorMessage = "Error: Login is not allowed for this account at this time.";
+                }
+            }
+            else // General failure (most likely incorrect password, but could be other edge cases)
+            {
+                errorMessage = "Error: Invalid email or password.";
+            }
+            // Let the component re-render to show the errorMessage.
+            // No StateHasChanged() needed because this is the end of the request processing for this component instance.
         }
-        // StateHasChanged() is usually not needed here as the component lifecycle handles it
     }
 
     private sealed class InputModel
     {
-        [Required]
-        [EmailAddress]
+        [Required(ErrorMessage = "The Email field is required.")]
+        [EmailAddress(ErrorMessage = "The Email field is not a valid e-mail address.")]
         public string Email { get; set; } = "";
 
-        [Required]
+        [Required(ErrorMessage = "The Password field is required.")]
         [DataType(DataType.Password)]
         public string Password { get; set; } = "";
 
@@ -144,8 +175,8 @@
         public bool RememberMe { get; set; }
     }
 
-    // Keep lifecycle methods if needed for logging/other setup
-    protected override void OnInitialized() { /* ... */ base.OnInitialized(); }
-    protected override void OnParametersSet() { /* ... */ base.OnParametersSet(); }
-    protected override async Task OnAfterRenderAsync(bool firstRender) { /* ... */ await base.OnAfterRenderAsync(firstRender); }
+    // --- Lifecycle methods (optional, keep if needed) ---
+    // protected override void OnInitialized() { base.OnInitialized(); }
+    // protected override void OnParametersSet() { base.OnParametersSet(); }
+    // protected override async Task OnAfterRenderAsync(bool firstRender) { await base.OnAfterRenderAsync(firstRender); }
 }
