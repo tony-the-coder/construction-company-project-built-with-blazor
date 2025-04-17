@@ -5,7 +5,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <base href="/" />
-    <link rel="stylesheet" href="_content/Radzen.Blazor/css/material-base.css" /> @* Or your chosen base theme *@
+    @* <link rel="stylesheet" href="_content/Radzen.Blazor/css/material-base.css" /> @* Or your chosen base theme *@ 
     <link rel="stylesheet" href="styles/output.css" />
     <link rel="stylesheet" href="LehmanCustomConstruction.styles.css" />
     <link rel="icon" type="image/png" href="favicon.png" />
@@ -16,12 +16,12 @@
 
     <CascadingAuthenticationState>
         @* <<< Ensure this is active <<< *@
-        <Routes @rendermode="InteractiveServer" />
+        <Routes @rendermode="new InteractiveServerRenderMode(prerender: false)" />
     </CascadingAuthenticationState>
 
-    <script src="https://cdn.jsdelivr.net/npm/flowbite@3.1.2/dist/flowbite.min.js"></script> 
+    @* <script src="https://cdn.jsdelivr.net/npm/flowbite@3.1.2/dist/flowbite.min.js"></script>  *@
     <script src="_framework/blazor.web.js"></script> 
-    <script src="_content/Radzen.Blazor/Radzen.Blazor.js?v=@(typeof(Radzen.Colors).Assembly.GetName().Version)"></script>
+    @* <script src="_content/Radzen.Blazor/Radzen.Blazor.js?v=@(typeof(Radzen.Colors).Assembly.GetName().Version)"></script> *@
 </body>
 
 </html>
