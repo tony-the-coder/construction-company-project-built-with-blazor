@@ -369,3 +369,4 @@ wwwroot/styles/output.css   # Ignore the Tailwind CSS output file
 node_modules/
 dist/
 .DS_Store
+*.pdf
