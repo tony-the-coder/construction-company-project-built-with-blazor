@@ -1,0 +1,115 @@
+﻿@page "/admin/contacts"
+@layout AdminLayout
+
+@using LehmanCustomConstruction.Data.Common 
+@using LehmanCustomConstruction.Data.Interfaces 
+@using Radzen
+@using Radzen.Blazor
+
+@inject IContactInquiryRepository ContactRepository
+@inject NavigationManager NavigationManager // May need later for viewing details
+@inject DialogService DialogService // For viewing details in a modal
+@inject NotificationService NotificationService // For status update feedback
+
+<h3 class="text-2xl font-semibold text-gray-100 mb-6 font-serif">Contact Form Inquiries</h3>
+
+@if (_isLoading && _inquiries == null)
+{
+    <p class="text-secondary"><em>Loading inquiries...</em></p>
+}
+else if (_inquiries == null || !_inquiries.Any())
+{
+    <p class="text-secondary"><em>No contact inquiries found.</em></p>
+}
+else
+{
+    <RadzenDataGrid @ref="_grid" Data="@_inquiries" TItem="ContactInquiry"
+                    AllowFiltering="true" FilterCaseSensitivity="FilterCaseSensitivity.CaseInsensitive" FilterMode="FilterMode.Simple"
+                    AllowPaging="true" PageSize="15" PagerHorizontalAlign="HorizontalAlign.Left" ShowPagingSummary="true"
+                    AllowSorting="true"
+                    IsLoading="@_isLoading"
+                    class="min-w-full shadow rounded-lg overflow-hidden border border-subtle">
+        <Columns>
+            @* Date Column *@
+            <RadzenDataGridColumn TItem="ContactInquiry" Property="SubmittedDate" Title="Received" FormatString="{0:yyyy-MM-dd HH:mm}" Width="160px" />
+
+            @* Status Column - With Filtering/Sorting & Display Badge *@
+            <RadzenDataGridColumn TItem="ContactInquiry" Property="Status" Title="Status" Width="130px">
+                <Template Context="inquiry">
+                    @* Display status as a badge *@
+                    <span class="@GetStatusBadgeClass(inquiry.Status) px-2 inline-flex text-xs leading-5 font-semibold rounded-full">
+                        @inquiry.Status.ToString()
+                    </span>
+                </Template>
+            </RadzenDataGridColumn>
+
+            @* Name Column *@
+            <RadzenDataGridColumn TItem="ContactInquiry" Property="Name" Title="Name" Width="180px" />
+
+            @* Email Column *@
+            <RadzenDataGridColumn TItem="ContactInquiry" Property="Email" Title="Email" Width="220px" />
+
+            @* Subject Column *@
+            <RadzenDataGridColumn TItem="ContactInquiry" Property="Subject" Title="Subject" />
+
+            @* Actions Column *@
+            <RadzenDataGridColumn TItem="ContactInquiry" Title="Actions" Width="100px" Frozen="true" FrozenPosition="FrozenColumnPosition.Right" Sortable="false" Filterable="false" TextAlign="TextAlign.Center">
+                <Template Context="inquiry">
+                    <RadzenButton Icon="visibility" ButtonStyle="ButtonStyle.Info" Variant="Variant.Flat" Size="ButtonSize.Small" Click="@(args => ViewInquiryDetails(inquiry))" @onclick:stopPropagation="true" />
+                    @* Maybe add quick status change later *@
+                </Template>
+            </RadzenDataGridColumn>
+        </Columns>
+    </RadzenDataGrid>
+}
+
+@code {
+    private bool _isLoading = true;
+    private IEnumerable<ContactInquiry>? _inquiries;
+    private RadzenDataGrid<ContactInquiry>? _grid;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadInquiries();
+    }
+
+    private async Task LoadInquiries()
+    {
+        _isLoading = true;
+        try
+        {
+            _inquiries = (await ContactRepository.GetAllAsync()).ToList(); // Get all inquiries
+        }
+        catch (Exception ex)
+        {
+            NotificationService.Notify(NotificationSeverity.Error, "Load Error", $"Failed to load inquiries: {ex.Message}");
+            _inquiries = Enumerable.Empty<ContactInquiry>();
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    // Function to determine badge class based on status
+    private string GetStatusBadgeClass(InquiryStatus status) => status switch
+    {
+        InquiryStatus.New => "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200",
+        InquiryStatus.Contacted => "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200",
+        InquiryStatus.Resolved => "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200",
+        InquiryStatus.Archived => "bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300",
+        _ => "bg-gray-100 text-gray-800"
+    };
+
+    // --- View Details Modal ---
+    private async Task ViewInquiryDetails(ContactInquiry inquiry)
+    {
+        await DialogService.OpenAsync<ContactInquiryDetailModal>($"Inquiry from {inquiry.Name}",
+            new Dictionary<string, object>() { { "InquiryId", inquiry.Id } },
+            new DialogOptions() { Width = "700px", Height = "auto", Resizable = true, Draggable = true });
+
+        // Optional: Refresh grid after modal closes if status might have changed
+        await LoadInquiries();
+        StateHasChanged();
+    }
+}

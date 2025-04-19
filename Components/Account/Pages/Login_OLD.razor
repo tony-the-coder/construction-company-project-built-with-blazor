@@ -1,0 +1,162 @@
+﻿@page "/Account/Old-Login"
+@rendermode InteractiveServer // Keep interactive for potential error messages
+
+@using System.ComponentModel.DataAnnotations
+@using LehmanCustomConstruction.Components.Account.Shared // Adjust if your StatusMessage is elsewhere
+@using Microsoft.AspNetCore.Authentication
+@using Microsoft.AspNetCore.Identity
+@using LehmanCustomConstruction.Data // Needed for ApplicationUser
+
+@inject SignInManager<ApplicationUser> SignInManager
+@inject UserManager<ApplicationUser> UserManager
+@inject ILogger<Login> Logger
+@inject NavigationManager NavigationManager
+@inject IdentityRedirectManager RedirectManager
+
+<PageTitle>Log in</PageTitle>
+
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-8 col-lg-6">
+            <h1 class="text-center mb-4">Log in</h1>
+
+            <section>
+                <StatusMessage Message="@errorMessage" />
+
+                @* --- Single form handles the actual POST submission --- *@
+                <form method="post" @formname="login">
+                    @* --- Antiforgery Token is ESSENTIAL for POST security --- *@
+                    <AntiforgeryToken />
+
+                    <h2 class="h5">Use a local account to log in.</h2>
+                    <hr />
+                    @* Temporarily remove ValidationSummary and ValidationMessages *@
+
+                    <div class="form-floating mb-3">
+                        @* Use plain input, ensure 'name' matches InputModel property path *@
+                        <input @bind="Input.Email" name="Input.Email" id="Input.Email" class="form-control" autocomplete="username" aria-required="true" placeholder="name@example.com" />
+                        <label for="Input.Email" class="form-label">Email</label>
+                    </div>
+                    <div class="form-floating mb-3">
+                        @* Use plain input, ensure 'name' matches InputModel property path *@
+                        <input type="password" @bind="Input.Password" name="Input.Password" id="Input.Password" class="form-control" autocomplete="current-password" aria-required="true" placeholder="password" />
+                        <label for="Input.Password" class="form-label">Password</label>
+                    </div>
+                    <div class="checkbox mb-3">
+                        <label class="form-label">
+                            @* Use plain input, ensure 'name' matches InputModel property path *@
+                            <input type="checkbox" @bind="Input.RememberMe" name="Input.RememberMe" id="Input.RememberMe" class="darker-border-checkbox form-check-input" />
+                            Remember me
+                        </label>
+                    </div>
+
+                    @* --- Single Submit button for the form --- *@
+                    <div class="mb-3">
+                        <button type="submit" class="w-100 btn btn-lg btn-primary">Log in</button>
+                    </div>
+
+                    @* --- Other links can remain inside the form --- *@
+                    <div class="text-center">
+                        <p>
+                            <a href="Account/ForgotPassword">Forgot your password?</a>
+                        </p>
+                        <p>
+                            <a href="@(NavigationManager.GetUriWithQueryParameters("Account/Register", new Dictionary<string, object?> { ["ReturnUrl"] = ReturnUrl }))">Register as a new user</a>
+                        </p>
+                        <p>
+                            <a href="Account/ResendEmailConfirmation">Resend email confirmation</a>
+                        </p>
+                    </div>
+                </form> @* --- End of the single form --- *@
+            </section>
+
+            @* --- External Logins Section (Placeholder - keep commented out) --- *@
+            @*
+            <section class="mt-4 pt-4 border-top">
+                <h3 class="h5 text-center">Use another service to log in.</h3>
+                <hr />
+                 <ExternalLoginPicker @rendermode="InteractiveServer" />
+            </section>
+            *@
+        </div>
+    </div>
+</div>
+
+@code {
+    private string? errorMessage;
+
+    [SupplyParameterFromForm] // Binds data from the POST request
+    private InputModel Input { get; set; } = new();
+
+    [SupplyParameterFromQuery]
+    private string? ReturnUrl { get; set; }
+
+    // --- The OnPostAsync handler remains the same ---
+    public async Task OnPostAsync()
+    {
+        ReturnUrl ??= "~/";
+        errorMessage = null;
+        Logger.LogInformation("Login attempt started for {Email}", Input.Email);
+
+        var result = await SignInManager.PasswordSignInAsync(Input.Email, Input.Password, Input.RememberMe, lockoutOnFailure: false);
+
+        if (result.Succeeded)
+        {
+            Logger.LogInformation("User '{Email}' logged in successfully.", Input.Email);
+            RedirectManager.RedirectTo(ReturnUrl);
+            return;
+        }
+        if (result.RequiresTwoFactor)
+        {
+            Logger.LogInformation("Login for '{Email}' requires two-factor authentication.", Input.Email);
+            var queryParams = new Dictionary<string, object?> { ["returnUrl"] = ReturnUrl, ["rememberMe"] = Input.RememberMe };
+            RedirectManager.RedirectTo("Account/LoginWith2fa", queryParams);
+            return;
+        }
+        if (result.IsLockedOut)
+        {
+            Logger.LogWarning("User account '{Email}' is locked out.", Input.Email);
+            RedirectManager.RedirectTo("Account/Lockout");
+            return;
+        }
+        else
+        {
+            Logger.LogWarning("Invalid login attempt for {Email}. SignInResult: {ResultStatus}", Input.Email, result.ToString());
+            if (result.IsNotAllowed)
+            {
+                var user = await UserManager.FindByEmailAsync(Input.Email);
+                if (user != null && !await UserManager.IsEmailConfirmedAsync(user))
+                {
+                    Logger.LogWarning("Login failed for '{Email}': Email not confirmed.", Input.Email);
+                    errorMessage = "Error: Your email address needs to be confirmed. Check your inbox or resend confirmation.";
+                }
+                else
+                {
+                    Logger.LogWarning("Login failed for '{Email}': Login is not allowed.", Input.Email);
+                    errorMessage = "Error: Login is not allowed for this account at this time.";
+                }
+            }
+            else
+            {
+                errorMessage = "Error: Invalid email or password.";
+            }
+        }
+        // When the handler finishes, the component will re-render automatically if needed
+        // to display the errorMessage.
+    }
+
+    // --- InputModel remains the same ---
+    private sealed class InputModel
+    {
+        [Required(ErrorMessage = "The Email field is required.")]
+        [EmailAddress(ErrorMessage = "The Email field is not a valid e-mail address.")]
+        public string Email { get; set; } = "";
+
+        [Required(ErrorMessage = "The Password field is required.")]
+        [DataType(DataType.Password)]
+        public string Password { get; set; } = "";
+
+        [Display(Name = "Remember me?")]
+        public bool RememberMe { get; set; }
+    }
+}

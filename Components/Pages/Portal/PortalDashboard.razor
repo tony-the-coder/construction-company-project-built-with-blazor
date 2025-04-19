@@ -1,0 +1,58 @@
+﻿@page "/portal"
+@using Microsoft.AspNetCore.Authorization
+@layout PortalLayout
+@* @attribute [Authorize]  *@
+@* TODO: Potentially add Roles="Customer" later if needed *@
+
+@inject AuthenticationStateProvider AuthenticationStateProvider
+
+<PageTitle>Customer Portal | Lehman Custom Construction</PageTitle>
+
+<h3 class="text-2xl font-semibold text-primary mb-6 font-serif">Portal Dashboard</h3>
+
+<div class="bg-white border border-subtle rounded-lg shadow-sm p-6 space-y-4">
+    <p class="text-lg">
+        Welcome back, <span class="font-medium">@_userName</span>!
+    </p>
+    <p class="text-secondary">
+        This is your central hub for managing your project details, documents, and communication with the Lehman Custom Construction team.
+    </p>
+
+    @* --- Placeholder for Dashboard Widgets --- *@
+    <div class="mt-8 grid grid-cols-1 md:grid-cols-2 gap-6">
+        @* Example Widget 1: Project Summary (Needs real data) *@
+        <div class="border border-subtle rounded-lg p-4 bg-gray-50">
+            <h4 class="font-semibold text-primary mb-2 font-serif">Current Project</h4>
+            <p class="text-secondary text-sm">Project Name Placeholder</p>
+            <p class="text-secondary text-sm">Status: Placeholder</p>
+            <a href="#" class="text-accent text-sm mt-2 inline-block hover:underline">View Project Details</a> @* Link to project details page later *@
+        </div>
+
+         @* Example Widget 2: Recent Documents (Needs real data) *@
+        <div class="border border-subtle rounded-lg p-4 bg-gray-50">
+            <h4 class="font-semibold text-primary mb-2 font-serif">Recent Documents</h4>
+            <p class="text-secondary text-sm">No new documents.</p> @* Replace with list *@
+            <a href="/portal/documents" class="text-accent text-sm mt-2 inline-block hover:underline">View All Documents</a>
+        </div>
+
+         @* Example Widget 3: Unread Messages (Needs real data) *@
+        <div class="border border-subtle rounded-lg p-4 bg-gray-50">
+            <h4 class="font-semibold text-primary mb-2 font-serif">Messages</h4>
+            <p class="text-secondary text-sm">No unread messages.</p> @* Replace with count/link *@
+            <a href="/portal/messages" class="text-accent text-sm mt-2 inline-block hover:underline">View Messages</a>
+        </div>
+    </div>
+    @* --- End Widgets --- *@
+
+</div>
+
+@code {
+    private string? _userName;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+        var user = authState.User;
+        _userName = user.Identity?.Name ?? "Valued Customer"; // Get logged-in user's name
+    }
+}

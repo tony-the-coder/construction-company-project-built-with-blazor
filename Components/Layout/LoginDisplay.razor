@@ -1,0 +1,43 @@
+﻿@* File: Components/Layout/LoginDisplay.razor *@
+@using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.AspNetCore.Components.Server.ProtectedBrowserStorage
+
+@inject NavigationManager Navigation
+@* @inject SignInManager<ApplicationUser> SignInManager *@
+
+<AuthorizeView>
+    <Authorized>
+        @* Show User Info when logged in *@
+        <div class="flex items-center space-x-3 text-sm">
+            <a class="text-secondary hover:text-accent" href="/Account/Manage" title="Manage your account">
+                Hello, @context.User.Identity?.Name!
+            </a>
+
+            @* --- TEMPORARILY COMMENTED OUT FOR TESTING --- *@
+            @*
+            <form action="/Account/Logout" method="post">
+                <AntiforgeryToken />
+                <input type="hidden" name="ReturnUrl" value="/" /> 
+                <button type="submit" class="text-secondary hover:text-accent">
+                    Logout
+                </button>
+            </form>
+            *@
+
+            @* You might want a simple link here temporarily if needed, though it won't function *@
+            <span class="text-secondary">(Logout form disabled for testing)</span>
+
+        </div>
+    </Authorized>
+    <NotAuthorized>
+        @* Show Register and Login links when logged out *@
+        <div class="flex items-center space-x-3 text-sm">
+            <a class="text-secondary hover:text-accent" href="/Account/Register">Register</a>
+            <a class="text-secondary hover:text-accent" href="/Account/Login">Log in</a>
+        </div>
+    </NotAuthorized>
+</AuthorizeView>
+
+@code {
+    // Code block remains, though unused in this test configuration
+}

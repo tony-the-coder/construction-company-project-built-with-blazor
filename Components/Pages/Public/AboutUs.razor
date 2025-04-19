@@ -1,0 +1,98 @@
+﻿@page "/about-us"
+@layout MainLayout
+@using LehmanCustomConstruction.Data.Interfaces 
+@inject IPageContentRepository PageContentRepository 
+
+<PageTitle>About Us | Lehman Custom Construction</PageTitle>
+
+<div class="bg-background min-h-screen">
+
+    @if (_isLoading)
+    {
+        <p class="text-center text-secondary py-20"><em>Loading content...</em></p>
+    }
+    else
+    {
+        @* --- Hero Section --- *@
+        @* Use theme colors/fonts, simplified background *@
+        <div class="py-16 text-center border-b border-subtle">
+            <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+                <h1 class="text-4xl font-bold tracking-tight text-primary sm:text-5xl font-serif">
+                    About Lehman Custom Construction
+                </h1>
+                <p class="mt-4 max-w-2xl mx-auto text-xl text-secondary font-sans">
+                    Building exceptional homes with unwavering commitment to quality and client collaboration.
+                </p>
+            </div>
+        </div>
+        @* --- End Hero Section --- *@
+
+        @* --- Main Content Section --- *@
+        <div class="max-w-4xl mx-auto py-16 px-4 sm:px-6 lg:px-8">
+            @* Use prose for typography, but force text color on the container *@
+            <div class="prose prose-lg max-w-none text-primary font-sans prose-a:text-accent hover:prose-a:text-accent">
+                @if (!string.IsNullOrEmpty(_aboutUsContent))
+                {
+                    @((MarkupString)_aboutUsContent)
+                }
+                else
+                {
+                    <p class="text-secondary"><em>About Us content is not available at the moment.</em></p>
+                }
+            </div>
+        </div>
+        @* --- End Main Content Section --- *@
+
+        @* --- Call to Action Section --- *@
+        @* Simplified background, added top border *@
+        <div class="py-16 border-t border-subtle">
+            <div class="max-w-4xl mx-auto text-center px-4 sm:px-6 lg:px-8">
+                <h2 class="text-3xl font-bold text-primary font-serif mb-4">
+                    Ready to Build Your Dream?
+                </h2>
+                <p class="text-secondary text-lg mb-8 font-sans">
+                    Let's discuss your vision. View our work or get in touch today.
+                </p>
+                <div class="flex justify-center gap-x-4">
+                    @* Styled CTA buttons *@
+                    <a href="/portfolio"
+                       class="inline-flex items-center justify-center rounded-md border border-transparent bg-accent px-5 py-3 text-base font-medium text-white hover:opacity-90">
+                        View Our Work
+                    </a>
+                    <a href="/contact"
+                       class="inline-flex items-center justify-center rounded-md border border-subtle bg-white px-5 py-3 text-base font-medium text-primary shadow-sm hover:bg-gray-50">
+                        Contact Us
+                    </a>
+                </div>
+            </div>
+        </div>
+        @* --- End Call to Action --- *@
+    }
+</div>
+
+@code {
+    // Use the @inject directive above instead of [Inject] property
+    // [Inject] private IPageContentRepository PageContentRepository { get; set; } = default!;
+
+    private string? _aboutUsContent;
+    private bool _isLoading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _isLoading = true;
+        try
+        {
+            // Fetch content using the @inject-ed repository
+            _aboutUsContent = await PageContentRepository.GetContentAsync("AboutUsMain");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error loading About Us content: {ex.Message}");
+            _aboutUsContent = "<p class='text-red-600'>Error loading content. Please try again later.</p>";
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+}

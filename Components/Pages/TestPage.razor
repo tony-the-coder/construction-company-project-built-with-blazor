@@ -1,0 +1,24 @@
+﻿@page "/asdf"
+
+<PageTitle>Index</PageTitle>
+
+<h1>Hello, world!</h1>
+
+<button @onclick="ToggleLoading" class="btn @(_isLoading ? "btn-secondary" : "btn-primary")">
+    Toggle Loading State
+</button>
+
+<hr class="my-3" />
+
+<button disabled="@_isLoading" class="btn @(_isLoading ? "btn-danger" : "btn-success")">
+    Test Disabled Button (Is Loading: @_isLoading)
+</button>
+
+@code {
+    private bool _isLoading = false;
+
+    private void ToggleLoading()
+    {
+        _isLoading = !_isLoading;
+    }
+}

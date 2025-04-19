@@ -1,0 +1,68 @@
+﻿@* --- File: Components/Layout/ImageTextRight.razor --- *@
+@inject NavigationManager NavManager
+
+<div class="py-4 relative overflow-hidden bg-white">
+    @* Adjust py-4 or py-12 as needed *@
+    <div class="grid grid-cols-1 md:grid-cols-2 max-w-screen-lg mx-auto gap-8 items-center">
+        @* Added gap and items-center *@
+
+        @* Text Content Container (Order 1 = Left side) *@
+        <div class="py-12 md:py-20 bg-slate-100 relative order-1 text-sky-950">
+            @* Example background color *@
+            <div class="relative z-10 px-6 md:pl-12">
+                @* Adjusted padding *@
+                <h2 class="font-black text-4xl lg:text-5xl leading-snug mb-6 md:mb-10">@ImageHeading</h2> @* Use generic ImageHeading *@
+                <p class="text-base text-opacity-90">
+                    @* Adjusted opacity for readability *@
+                    @ImageText @* Use generic ImageText *@
+                </p>
+               
+                <RadzenButton class="mt-8"
+                              Variant="Variant.Outlined" 
+                              Click="@NavigateToLink"
+                              Text="@ButtonText"
+                              ButtonStyle="ButtonStyle.Secondary" /> @* Example: Secondary style *@
+            </div>
+        </div>
+
+        @* Image Container (Order 2 = Right side) *@
+        <div class="w-full flex flex-col items-start order-2">
+            @* Removed md:pl-16, padding handled by parent gap *@
+            <h2 class="text-[#64618C] font-bold text-2xl max-w-xs text-left mb-6 md:mb-12 mt-10 md:mt-0 px-4 md:px-0">@AboveImageHeading</h2> @* Added padding for mobile *@
+            <div class="h-full w-full mt-auto overflow-hidden relative aspect-[4/3]">
+                @* Added aspect ratio container *@
+                <img src="@ImageUrl" class="h-full w-full object-cover" alt="@AboveImageHeading"> @* Use generic ImageUrl *@
+            </div>
+        </div>
+
+    </div>
+</div>
+
+@code {
+    // Heading that appears *above* the image column
+    [Parameter] public string? AboveImageHeading { get; set; } = "Default Heading Above Image";
+
+    // Heading within the main text block
+    [Parameter] public string? ImageHeading { get; set; } = "Default Text Block Heading";
+
+    // Paragraph text within the main text block
+    [Parameter] public string? ImageText { get; set; } = "Default paragraph text goes here. Lorem ipsum dolor sit amet...";
+
+    // Text for the button
+    [Parameter] public string ButtonText { get; set; } = "Click Me";
+
+    // Destination URL for the button
+    [Parameter] public string ButtonLink { get; set; } = "#";
+
+    // Source URL for the image
+    [Parameter] public string? ImageUrl { get; set; } = "https://picsum.photos/800/600?grayscale&blur=2"; 
+
+    // Method to handle navigation on button click
+    private void NavigateToLink()
+    {
+        if (!string.IsNullOrEmpty(ButtonLink))
+        {
+            NavManager.NavigateTo(ButtonLink);
+        }
+    }
+}

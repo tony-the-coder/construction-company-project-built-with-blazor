@@ -1,0 +1,232 @@
+﻿@* File Path: Components/Pages/Admin/BlogPostForm.razor *@
+@page "/admin/blog/edit"
+@page "/admin/blog/edit/{Id:int}"
+@layout AdminLayout 
+
+@using LehmanCustomConstruction.Data.Blogs
+@using System.Linq
+@using Radzen 
+@using Radzen.Blazor
+@using Microsoft.AspNetCore.Components.Forms
+@using System.Text.RegularExpressions
+
+@inject IBlogCategoryRepository BlogCategoryRepository
+@inject IBlogPostRepository BlogPostRepository
+@inject NavigationManager NavigationManager
+@inject Radzen.DialogService DialogService
+@inject Radzen.NotificationService NotificationService
+
+@* Apply theme text colors to the heading *@
+<h3 class="text-2xl font-semibold text-primary dark:text-gray-100 mb-6 font-serif"> 
+    @(IsNewPost ? "Create New Blog Post" : $"Edit Blog Post: {blogPost.Title}")
+</h3>
+
+<EditForm Model="blogPost" OnValidSubmit="HandleValidSubmit">
+    <DataAnnotationsValidator />
+    <ValidationSummary class="text-red-600 dark:text-red-400 mb-4 p-3 border border-red-300 dark:border-red-600 bg-red-50 dark:bg-red-900/20 rounded" /> 
+
+    @* --- Standard Form Fields with Tailwind Styling --- *@
+    <div class="space-y-4"> @* Added space between form groups *@
+        <div>
+            <label for="title" class="block text-sm font-medium text-primary dark:text-gray-300">Title</label>
+            @* Apply Tailwind form styling *@
+            <InputText id="title" @bind-Value="blogPost.Title" class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:border-accent focus:ring-accent sm:text-sm bg-white dark:bg-gray-700 text-primary dark:text-white placeholder-gray-400 dark:placeholder-gray-500" />
+            <ValidationMessage For="@(() => blogPost.Title)" class="text-red-600 dark:text-red-400 text-xs mt-1" />
+        </div>
+
+        <div>
+            <label for="slug" class="block text-sm font-medium text-primary dark:text-gray-300">Slug (URL friendly)</label>
+            @* Apply Tailwind form styling. Slug generation on input added. *@
+            <InputText id="slug" @bind-Value="blogPost.Slug" @oninput='(e) => { blogPost.Slug = GenerateSlug(e.Value?.ToString()); }' class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:border-accent focus:ring-accent sm:text-sm bg-white dark:bg-gray-700 text-primary dark:text-white placeholder-gray-400 dark:placeholder-gray-500" />
+             <small class="text-secondary dark:text-gray-400 text-xs mt-1">Required. Use lowercase letters, numbers, and hyphens. Auto-generates from title.</small>
+             <ValidationMessage For="@(() => blogPost.Slug)" class="text-red-600 dark:text-red-400 text-xs mt-1" />
+        </div>
+
+        <div>
+            <label for="author" class="block text-sm font-medium text-primary dark:text-gray-300">Author</label>
+             @* Apply Tailwind form styling *@
+            <InputText id="author" @bind-Value="blogPost.Author" class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:border-accent focus:ring-accent sm:text-sm bg-white dark:bg-gray-700 text-primary dark:text-white placeholder-gray-400 dark:placeholder-gray-500" />
+            <ValidationMessage For="@(() => blogPost.Author)" class="text-red-600 dark:text-red-400 text-xs mt-1" />
+        </div>
+
+        <div>
+            <label for="excerpt" class="block text-sm font-medium text-primary dark:text-gray-300">Excerpt (Short Summary)</label>
+             @* Apply Tailwind form styling *@
+            <InputTextArea id="excerpt" @bind-Value="blogPost.Excerpt" rows="3" class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:border-accent focus:ring-accent sm:text-sm bg-white dark:bg-gray-700 text-primary dark:text-white placeholder-gray-400 dark:placeholder-gray-500" />
+             <ValidationMessage For="@(() => blogPost.Excerpt)" class="text-red-600 dark:text-red-400 text-xs mt-1" />
+        </div>
+
+        <div>
+            <label for="imageUrl" class="block text-sm font-medium text-primary dark:text-gray-300">Featured Image URL</label>
+             @* Apply Tailwind form styling *@
+            <InputText id="imageUrl" @bind-Value="blogPost.ImageUrl" class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:border-accent focus:ring-accent sm:text-sm bg-white dark:bg-gray-700 text-primary dark:text-white placeholder-gray-400 dark:placeholder-gray-500" />
+            <ValidationMessage For="@(() => blogPost.ImageUrl)" class="text-red-600 dark:text-red-400 text-xs mt-1" />
+        </div>
+    </div>
+    @* ----------------------------- *@
+    
+    @* --- Radzen Components (Styling mostly from Radzen base CSS) --- *@
+    <div class="my-6"> 
+        <label class="block text-sm font-medium text-primary dark:text-gray-300 mb-1">Categories</label> 
+        <RadzenDropDown AllowClear="true"
+                        Multiple="true"
+                        Chips="true"
+                        AllowFiltering="true"
+                        Placeholder="Select categories..."
+                        Data="@allCategories"
+                        TextProperty="Name"
+                        ValueProperty="ID"
+                        @bind-Value="@selectedCategoryIds"
+                        Style="width: 100%;" 
+                        Name="Categories"/> 
+         <ValidationMessage For="@(() => selectedCategoryIds)" class="text-red-600 dark:text-red-400 text-xs mt-1" /> 
+    </div>
+   
+    <div class="my-6"> 
+        <label class="block text-sm font-medium text-primary dark:text-gray-300 mb-1">Content</label> 
+        <RadzenHtmlEditor @bind-Value="blogPost.Content" style="height: 450px;" UploadUrl="upload/image" UploadComplete=@OnUploadComplete Name="Content" />
+         <ValidationMessage For="@(() => blogPost.Content)" class="text-red-600 dark:text-red-400 text-xs mt-1" />
+    </div>
+    @* ---------------------------------------------------------------------- *@
+
+    @* --- Checkbox --- *@
+    <div class="my-6 flex items-center"> 
+        @* Apply Tailwind checkbox styling using accent color *@
+        <InputCheckbox id="isPublished" @bind-Value="blogPost.IsPublished" class="h-4 w-4 rounded border-gray-300 dark:border-gray-600 text-accent dark:text-accent bg-gray-100 dark:bg-gray-700 focus:ring-accent dark:focus:ring-offset-gray-800" /> 
+        <label for="isPublished" class="ml-2 block text-sm font-medium text-primary dark:text-gray-300">
+            Published
+        </label>
+    </div>
+    @* ---------------------------------------------------------------------- *@
+
+    @* --- Buttons with Tailwind Styling --- *@
+    <div class="mt-8 flex items-center gap-x-4 border-t border-subtle pt-6"> 
+        @* Save Button - Use Accent color *@
+        <button type="submit" 
+                class="inline-flex justify-center rounded-md border border-transparent bg-accent px-4 py-2 text-sm font-medium text-white shadow-sm hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2 dark:focus:ring-offset-gray-800">
+            @(IsNewPost ? "Create Post" : "Update Post")
+        </button>
+        @* Cancel Button - Use subtle style *@
+        <button type="button" 
+                class="rounded-md border border-subtle bg-white dark:bg-gray-700 px-4 py-2 text-sm font-medium text-primary dark:text-gray-200 shadow-sm hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2 dark:focus:ring-offset-gray-800" 
+                @onclick="CancelClicked">
+            Cancel
+        </button>
+    </div>
+    @* --------------------------------- *@
+
+</EditForm>
+
+@code {
+    // --- Using the @code block from your working version ---
+    [Parameter] public int? Id { get; set; }
+
+    // Use the correct BlogPost type from your Data namespace
+    private LehmanCustomConstruction.Data.Blogs.BlogPost blogPost = new BlogPost { BlogPostCategories = new List<BlogPostCategory>() };
+    private bool IsNewPost => Id == null;
+    private IEnumerable<BlogCategory> allCategories = Enumerable.Empty<BlogCategory>();
+    private IEnumerable<int> selectedCategoryIds = Enumerable.Empty<int>();
+
+    protected override async Task OnParametersSetAsync()
+    {
+        allCategories = await BlogCategoryRepository.GetAllAsync();
+
+        if (!IsNewPost)
+        {
+            var fetchedPost = await BlogPostRepository.GetByIdAsync(Id.Value); // Use temp var
+
+            if (fetchedPost == null)
+            {
+                NotificationService.Notify(NotificationSeverity.Error, "Error", "Blog post not found.");
+                NavigationManager.NavigateTo("/admin/blog");
+                return;
+            }
+            blogPost = fetchedPost; // Assign to correct type
+            if (blogPost.BlogPostCategories == null)
+            {
+                blogPost.BlogPostCategories = new List<BlogPostCategory>();
+            }
+            selectedCategoryIds = blogPost.BlogPostCategories.Select(bc => bc.BlogCategoryId).ToList();
+        }
+        else
+        {
+            blogPost = new BlogPost { BlogPostCategories = new List<BlogPostCategory>(), PublishDate = DateTime.UtcNow }; // Ensure correct type
+            selectedCategoryIds = Enumerable.Empty<int>();
+        }
+    }
+
+    private string GenerateSlug(string? phrase) // Added Slug generation
+    {
+        if (string.IsNullOrWhiteSpace(phrase)) return string.Empty;
+        string str = phrase.ToLowerInvariant();
+        str = Regex.Replace(str, @"[^a-z0-9\s-]", "");          
+        str = Regex.Replace(str, @"\s+", " ").Trim();          
+        str = Regex.Replace(str, @"\s", "-");                 
+        str = Regex.Replace(str, @"-+", "-");                  
+        return str;
+    }
+
+    private async Task HandleValidSubmit()
+    {
+        // Basic validation moved here for clarity
+        if (string.IsNullOrWhiteSpace(blogPost.Title) || string.IsNullOrWhiteSpace(blogPost.Slug) || string.IsNullOrWhiteSpace(blogPost.Excerpt) || !selectedCategoryIds.Any() || string.IsNullOrWhiteSpace(blogPost.Content) || string.IsNullOrWhiteSpace(Regex.Replace(blogPost.Content, "<.*?>", string.Empty)))
+        {
+            NotificationService.Notify(NotificationSeverity.Warning, "Validation Error", "Please fill out all required fields (Title, Slug, Excerpt, Category, Content).");
+            return;
+        }
+
+        // Slug uniqueness check
+        if (await BlogPostRepository.SlugExistsAsync(blogPost.ID, blogPost.Slug))
+        {
+            NotificationService.Notify(NotificationSeverity.Error, "Validation Error", $"The slug '{blogPost.Slug}' is already in use.");
+            return;
+        }
+
+        // Proceed with saving
+        try
+        {
+            // Update category relationships before saving
+            if (blogPost.BlogPostCategories == null) blogPost.BlogPostCategories = new List<BlogPostCategory>();
+            blogPost.BlogPostCategories.Clear(); 
+            foreach (var catId in selectedCategoryIds)
+            {
+                 blogPost.BlogPostCategories.Add(new BlogPostCategory { BlogCategoryId = catId, BlogPostId = blogPost.ID }); // Assuming structure
+            }
+
+            if (IsNewPost)
+            {
+                await BlogPostRepository.AddAsync(blogPost);
+                NotificationService.Notify(NotificationSeverity.Success, "Success", "Blog post created successfully!", 4000);
+            }
+            else
+            {
+                // Pass selected IDs for update logic in repository if needed
+                await BlogPostRepository.UpdateAsync(blogPost, selectedCategoryIds); 
+                NotificationService.Notify(NotificationSeverity.Success, "Success", "Blog post updated successfully!", 4000);
+            }
+            NavigationManager.NavigateTo("/admin/blog");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error saving blog post: {ex.Message}\n{ex.StackTrace}");
+            NotificationService.Notify(NotificationSeverity.Error, "Save Error", $"Error saving blog post: {ex.Message}");
+        }
+    }
+
+    void OnUploadComplete(UploadCompleteEventArgs args) 
+    { 
+        Console.WriteLine($"File uploaded: {args.RawResponse}");
+        // Add logic here later if needed
+    }
+    
+    private void CancelClicked() 
+    { 
+        NavigationManager.NavigateTo("/admin/blog");
+    }
+
+    // Ensure BlogPost, BlogCategory, BlogPostCategory types match your actual models
+    // These are just for reference IF the @using directives weren't enough
+    // public class BlogPost { public int ID { get; set; } public string Title { get; set; } = ""; public string Slug { get; set; } = ""; public string? Author { get; set; } public string Excerpt { get; set; } = ""; public string? ImageUrl { get; set; } public string? Content { get; set; } public bool IsPublished { get; set; } public DateTime PublishDate { get; set; } public List<BlogPostCategory> BlogPostCategories { get; set; } = new(); }
+    // public class BlogCategory { public int ID { get; set; } public string Name { get; set; } = ""; public string Slug { get; set; } = ""; }
+    // public class BlogPostCategory { public int BlogPostId { get; set; } public int BlogCategoryId { get; set; } }
+}

@@ -1,0 +1,111 @@
+﻿@* File: Components/Pages/Admin/Contacts/ContactInquiryDetailModal.razor *@
+@using LehmanCustomConstruction.Data.Common
+@using LehmanCustomConstruction.Data.Interfaces
+@using System.ComponentModel.DataAnnotations
+@inject IContactInquiryRepository ContactRepository
+@inject DialogService DialogService
+@inject NotificationService NotificationService
+
+@if (_inquiry == null)
+{
+    <p><em>Loading inquiry details...</em></p>
+}
+else
+{
+    <div class="p-4 space-y-4">
+        <h4 class="text-lg font-semibold text-primary">Inquiry Details</h4>
+
+        <div class="grid grid-cols-3 gap-x-4 gap-y-2 text-sm">
+            <strong class="col-span-1 text-secondary">Received:</strong>
+            <span class="col-span-2 text-primary">@_inquiry.SubmittedDate.ToString("yyyy-MM-dd HH:mm")</span>
+
+            <strong class="col-span-1 text-secondary">From:</strong>
+            <span class="col-span-2 text-primary">@_inquiry.Name</span>
+
+            <strong class="col-span-1 text-secondary">Email:</strong>
+            <span class="col-span-2 text-primary">@_inquiry.Email</span>
+
+            @if (!string.IsNullOrWhiteSpace(_inquiry.Phone))
+            {
+                <strong class="col-span-1 text-secondary">Phone:</strong>
+                <span class="col-span-2 text-primary">@_inquiry.Phone</span>
+            }
+
+            @if (!string.IsNullOrWhiteSpace(_inquiry.Subject))
+            {
+                <strong class="col-span-1 text-secondary">Subject:</strong>
+                <span class="col-span-2 text-primary">@_inquiry.Subject</span>
+            }
+        </div>
+
+        <div>
+            <strong class="block text-sm font-medium text-secondary mb-1">Message:</strong>
+            <div class="p-3 border border-subtle rounded-md bg-gray-50 text-primary whitespace-pre-wrap">@_inquiry.Message</div>
+        </div>
+
+        <hr class="border-subtle my-4" />
+
+        <h4 class="text-lg font-semibold text-primary">Admin Actions</h4>
+
+        @* Status Update *@
+        <div class="flex items-center gap-4">
+            <label for="status" class="block text-sm font-medium text-secondary">Update Status:</label>
+            <RadzenDropDown TValue="InquiryStatus" @bind-Value="_selectedStatus" Data="@_statuses" Style="min-width: 200px;" Name="StatusUpdate" />
+        </div>
+
+        @* Admin Notes *@
+        <div>
+            <label for="adminNotes" class="block text-sm font-medium text-secondary">Admin Notes:</label>
+            <RadzenTextArea @bind-Value="_inquiry.AdminNotes" rows="3" class="w-full mt-1" Name="AdminNotes" /> @* RadzenTextArea styles itself *@
+        </div>
+
+        @* Buttons *@
+        <div class="flex justify-end gap-3 mt-5">
+            <RadzenButton Text="Cancel" ButtonStyle="ButtonStyle.Light" Click="@(() => DialogService.Close(false))" Disabled="@_isSaving" />
+            <RadzenButton Text="Save Changes" ButtonStyle="ButtonStyle.Primary" Click="@SaveChanges" Disabled="@_isSaving" IsBusy="@_isSaving" class="bg-accent text-white" />
+        </div>
+
+    </div>
+}
+
+@code {
+    [Parameter] public int InquiryId { get; set; }
+
+    private ContactInquiry? _inquiry;
+    private InquiryStatus _selectedStatus;
+    private List<InquiryStatus> _statuses = Enum.GetValues(typeof(InquiryStatus)).Cast<InquiryStatus>().ToList();
+    private bool _isSaving = false;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _inquiry = await ContactRepository.GetByIdAsync(InquiryId);
+        if (_inquiry != null)
+        {
+            _selectedStatus = _inquiry.Status; // Initialize dropdown
+        }
+        // Handle case where inquiry is not found? (Shouldn't happen if called from grid)
+    }
+
+    private async Task SaveChanges()
+    {
+        if (_inquiry == null || _isSaving) return;
+
+        _isSaving = true;
+
+        try
+        {
+            // Only update notes if they actually changed? Or always pass current value.
+            // Passing current value is simpler.
+            await ContactRepository.UpdateStatusAsync(_inquiry.Id, _selectedStatus, _inquiry.AdminNotes);
+            NotificationService.Notify(NotificationSeverity.Success, "Success", "Inquiry status updated.");
+            DialogService.Close(true); // Close dialog and indicate success
+        }
+        catch (Exception ex)
+        {
+            NotificationService.Notify(NotificationSeverity.Error, "Error", $"Failed to update status: {ex.Message}");
+            _isSaving = false; // Re-enable button on error
+            StateHasChanged(); // Update UI
+        }
+        // _isSaving is reset implicitly by DialogService.Close or in catch
+    }
+}

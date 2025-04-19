@@ -1,0 +1,29 @@
+﻿@page "/admin" 
+@using Microsoft.AspNetCore.Authorization 
+@layout AdminLayout 
+@attribute [Authorize]  
+@* TODO: Add Roles = "Admin" or similar later for role-specific access *@
+
+@* Apply theme colors/fonts *@
+<h3 class="text-2xl font-semibold text-gray-100 mb-6 font-serif">Admin Dashboard</h3>
+
+<div class="bg-white border border-subtle rounded-lg shadow-sm p-6">
+    <p class="text-secondary">
+        Welcome to the Lehman Custom Construction Admin Panel. 
+        Use the navigation on the left to manage site content.
+    </p>
+    
+    @* TODO: Add dashboard widgets here later, like: *@
+    @* - New Contact Inquiry Count *@
+    @* - Recent Blog Posts *@
+    @* - Quick Links to Create Content *@
+
+</div>
+
+@code {
+    // Code behind for dashboard logic (e.g., fetching counts) can be added later
+    protected override void OnInitialized()
+    {
+        // Example: Fetch initial data for dashboard widgets here
+    }
+}

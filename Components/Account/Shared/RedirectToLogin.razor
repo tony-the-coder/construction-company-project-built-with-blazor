@@ -1,8 +1,27 @@
-﻿@inject NavigationManager NavigationManager
+﻿@* File: Components/Account/Shared/RedirectToLogin.razor *@
+@using Microsoft.AspNetCore.Components.Web
+@inject NavigationManager Navigation
+@inject IdentityRedirectManager RedirectManager
 
 @code {
+    [CascadingParameter]
+    private HttpContext? HttpContext { get; set; }
+
     protected override void OnInitialized()
     {
-        NavigationManager.NavigateTo($"Account/Login?returnUrl={Uri.EscapeDataString(NavigationManager.Uri)}", forceLoad: true);
+        // Get the current URI and convert it to a base-relative path
+        var returnUrl = Navigation.ToBaseRelativePath(Navigation.Uri);
+
+        // If the relative path is empty (meaning we are at the base URL '/'),
+        // set it to "/" explicitly for clarity in the ReturnUrl.
+        if (string.IsNullOrEmpty(returnUrl))
+        {
+            returnUrl = "/";
+        }
+
+        // Use IdentityRedirectManager and pass the relative path as ReturnUrl
+        RedirectManager.RedirectTo(
+            "Account/Login",
+             new Dictionary<string, object?> { ["ReturnUrl"] = returnUrl });
     }
 }

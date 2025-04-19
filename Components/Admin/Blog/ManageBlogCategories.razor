@@ -1,0 +1,259 @@
+﻿@page "/admin/categories"
+@layout AdminLayout 
+
+@using LehmanCustomConstruction.Data.Blogs
+@using LehmanCustomConstruction.Data.Blogs.Interfaces
+@using System.Text.RegularExpressions 
+@using Radzen 
+@using Radzen.Blazor 
+@using Microsoft.AspNetCore.Components.Forms 
+
+@inject IBlogCategoryRepository CategoryRepository
+@inject NavigationManager NavigationManager
+@inject Radzen.DialogService DialogService
+@inject Radzen.NotificationService NotificationService
+
+@* Apply theme text colors and font *@
+<h3 class="text-2xl font-semibold text-primary dark:text-gray-100 mb-4 font-serif">Manage Blog Categories</h3>
+
+@* Style the Add button with theme colors *@
+<div class="mb-6"> @* Increased margin-bottom *@
+    <RadzenButton Icon="add_circle_outline" 
+                  Text="Add New Category" 
+                  Click="@InsertRow" 
+                  Disabled="@(_categoryToInsert != null || _categoryToEdit != null)" 
+                  ButtonStyle="ButtonStyle.Primary" 
+                  class="bg-accent hover:opacity-90 text-white" /> @* Added Tailwind classes for color *@
+</div>
+
+@if (_isLoading && _categories == null) @* Show loading only on initial load *@
+{
+    @* Apply theme text color *@
+    <div class="flex justify-center items-center p-4">
+        <p class="text-secondary dark:text-gray-400">Loading categories...</p>
+    </div>
+}
+else
+{
+    @* RadzenDataGrid: Styling largely controlled by Radzen CSS. Tailwind class adds basic structure. *@
+    <RadzenDataGrid @ref="_grid" Data="@_categories" TItem="BlogCategory"
+                    AllowFiltering="true" FilterCaseSensitivity="FilterCaseSensitivity.CaseInsensitive" FilterMode="FilterMode.Simple"
+                    AllowPaging="true" PageSize="10" PagerHorizontalAlign="HorizontalAlign.Left" ShowPagingSummary="true"
+                    AllowSorting="true"
+                    EditMode="DataGridEditMode.Single" RowUpdate="@OnUpdateRow" RowCreate="@OnCreateRow"
+                    IsLoading="@_isLoading"
+                    class="min-w-full shadow rounded-lg overflow-hidden border border-subtle dark:border-gray-700"> @* Added subtle border *@
+        <Columns>
+            @* Name Column - Use RadzenTextBox which inherits Radzen styling *@
+            <RadzenDataGridColumn TItem="BlogCategory" Property="Name" Title="Name">
+                <EditTemplate Context="category">
+                    <RadzenTextBox @bind-Value="category.Name" Style="width:100%; display: block;" Name="CategoryName" Change="@(args => { category.Slug = GenerateSlug(category.Name); StateHasChanged(); })"/> @* Update slug on name change immediately for validation if needed *@
+                    <RadzenRequiredValidator Text="Name is required" Component="CategoryName" Popup="true" Style="position: absolute" />
+                </EditTemplate>
+            </RadzenDataGridColumn>
+
+            @* Slug Column - Use RadzenTextBox, auto-generate on name change *@
+            <RadzenDataGridColumn TItem="BlogCategory" Property="Slug" Title="Slug">
+                 <Template Context="category">
+                    @category.Slug @* Display read-only slug in view mode *@
+                </Template>
+                <EditTemplate Context="category">
+                    @* Slug is now generated from Name, make it read-only or hidden if preferred *@
+                    <RadzenTextBox @bind-Value="category.Slug" Style="width:100%; display: block;" Name="CategorySlug" ReadOnly="true" /> 
+                    <RadzenRequiredValidator Text="Slug is required" Component="CategorySlug" Popup="true" Style="position: absolute" />
+                </EditTemplate>
+            </RadzenDataGridColumn>
+
+            @* Actions Column - RadzenButtons inherit Radzen styling *@
+            <RadzenDataGridColumn TItem="BlogCategory" Title="Actions" Width="150px" Frozen="true" FrozenPosition="FrozenColumnPosition.Right" Sortable="false" Filterable="false" TextAlign="TextAlign.Center">
+                <Template Context="category">
+                    <RadzenButton Icon="edit" ButtonStyle="ButtonStyle.Light" Variant="Variant.Flat" Size="ButtonSize.Small" Click="@(args => EditRow(category))" @onclick:stopPropagation="true" Disabled="@(_categoryToInsert != null)" />
+                    <RadzenButton Icon="delete" ButtonStyle="ButtonStyle.Danger" Variant="Variant.Flat" Shade="Shade.Lighter" Size="ButtonSize.Small" Class="my-1 ms-1" Click="@(args => DeleteRow(category))" @onclick:stopPropagation="true" Disabled="@(_categoryToInsert != null || _categoryToEdit != null)" />
+                </Template>
+                 <EditTemplate Context="category">
+                    <RadzenButton Icon="save" ButtonStyle="ButtonStyle.Success" Variant="Variant.Flat" Size="ButtonSize.Small" Click="@((args) => SaveRow(category))" Disabled="@_isLoading" /> @* Disable save while loading *@
+                    <RadzenButton Icon="cancel" ButtonStyle="ButtonStyle.Light" Variant="Variant.Flat" Size="ButtonSize.Small" Class="my-1 ms-1" Click="@((args) => CancelEdit(category))" Disabled="@_isLoading" /> @* Disable cancel while loading *@
+                </EditTemplate>
+            </RadzenDataGridColumn>
+        </Columns>
+    </RadzenDataGrid>
+}
+
+
+@code {
+    private bool _isLoading = true; // Used for initial load and during operations
+    private List<BlogCategory>? _categories; // Use List<T> for easier manipulation if needed
+    private RadzenDataGrid<BlogCategory>? _grid;
+
+    private BlogCategory? _categoryToInsert;
+    private BlogCategory? _categoryToEdit;
+    private BlogCategory? _originalCategoryBeforeEdit;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadCategories();
+    }
+
+    private async Task LoadCategories()
+    {
+        _isLoading = true;
+        try
+        {
+            _categories = (await CategoryRepository.GetAllAsync()).ToList(); 
+        }
+        catch (Exception ex)
+        {
+            NotificationService.Notify(NotificationSeverity.Error, "Load Error", $"Failed to load categories: {ex.Message}");
+            _categories = new List<BlogCategory>(); // Ensure it's an empty list
+        }
+        finally
+        {
+            _isLoading = false;
+        }
+    }
+
+    private async Task InsertRow()
+    {
+        _categoryToInsert = new BlogCategory();
+        await _grid!.InsertRow(_categoryToInsert);
+    }
+
+    private async Task EditRow(BlogCategory category)
+    {
+        _categoryToEdit = category;
+        _originalCategoryBeforeEdit = new BlogCategory { ID = category.ID, Name = category.Name, Slug = category.Slug }; 
+        await _grid!.EditRow(category);
+    }
+
+    private async Task SaveRow(BlogCategory category)
+    {
+        category.Slug = GenerateSlug(category.Name); 
+
+        if (string.IsNullOrWhiteSpace(category.Name) || string.IsNullOrWhiteSpace(category.Slug))
+        {
+             NotificationService.Notify(NotificationSeverity.Warning, "Validation Error", "Name and Slug are required.");
+             return; 
+        }
+        
+        // TODO: Add Slug Uniqueness Check if needed for categories
+
+        await _grid!.UpdateRow(category); 
+    }
+
+    private async Task OnUpdateRow(BlogCategory category)
+    {
+        if (_categoryToEdit == null || _categoryToEdit.ID != category.ID) return; 
+
+        _isLoading = true; 
+
+        try
+        {
+            await CategoryRepository.UpdateAsync(category);
+            NotificationService.Notify(NotificationSeverity.Success, "Success", "Category updated successfully.");
+             _categoryToEdit = null; 
+             _originalCategoryBeforeEdit = null;
+        }
+        catch (Exception ex)
+        {
+            NotificationService.Notify(NotificationSeverity.Error, "Update Error", $"Failed to update category: {ex.Message}");
+            if (_originalCategoryBeforeEdit != null)
+            {
+                 category.Name = _originalCategoryBeforeEdit.Name;
+                 category.Slug = _originalCategoryBeforeEdit.Slug;
+            }
+            _categoryToEdit = null; 
+             _originalCategoryBeforeEdit = null;
+             await LoadCategories(); // Reload to reset state
+             _grid!.CancelEditRow(category); // Explicitly cancel grid edit if save failed
+        }
+        finally 
+        {
+            _isLoading = false;
+        }
+    }
+
+    private async Task OnCreateRow(BlogCategory category)
+    {
+         _isLoading = true; 
+         try
+         {
+             await CategoryRepository.AddAsync(category);
+             NotificationService.Notify(NotificationSeverity.Success, "Success", "Category added successfully.");
+             await LoadCategories(); // Reload to get the new item with its ID
+         }
+         catch (Exception ex)
+         {
+             NotificationService.Notify(NotificationSeverity.Error, "Create Error", $"Failed to add category: {ex.Message}");
+             await LoadCategories(); // Reload to ensure clean state
+         }
+         finally
+         {
+            _isLoading = false;
+            _categoryToInsert = null; 
+         }
+    }
+    
+    private void CancelEdit(BlogCategory category) 
+    {
+        _grid!.CancelEditRow(category); // Tell the grid to cancel edit/insert
+        
+        // Manually restore original values if necessary (for edit mode)
+        if (category == _categoryToEdit && _originalCategoryBeforeEdit != null)
+        {
+            category.Name = _originalCategoryBeforeEdit.Name;
+            category.Slug = _originalCategoryBeforeEdit.Slug;
+        }
+
+        // Clear our tracking variables
+        _categoryToEdit = null;
+        _originalCategoryBeforeEdit = null;
+        _categoryToInsert = null;
+    }
+
+
+    private async Task DeleteRow(BlogCategory category)
+    {
+        var confirmed = await DialogService.Confirm($"Are you sure you want to delete the category '{category.Name}'?", "Confirm Deletion", new ConfirmOptions { OkButtonText = "Yes", CancelButtonText = "No" });
+
+        if (confirmed == true)
+        {
+            _isLoading = true; 
+            bool deleted = false;
+            try
+            {
+                 // Ensure _categories is not null before trying to remove
+                if (_categories != null) 
+                {
+                    deleted = await CategoryRepository.DeleteAsync(category.ID);
+                    if (deleted)
+                    {
+                        NotificationService.Notify(NotificationSeverity.Success, "Success", "Category deleted successfully.");
+                        await LoadCategories(); // Refresh the grid data
+                    }
+                    else
+                    {
+                         NotificationService.Notify(NotificationSeverity.Warning, "Deletion Failed", "Category could not be deleted (possibly in use).");
+                    }
+                }
+            }
+            catch(Exception ex)
+            {
+                 NotificationService.Notify(NotificationSeverity.Error, "Deletion Error", $"Error deleting category: {ex.Message}");
+            }
+            finally{
+                _isLoading = false;
+            }
+        }
+    }
+
+    private string GenerateSlug(string? phrase)
+    {
+        if (string.IsNullOrWhiteSpace(phrase)) return string.Empty;
+        string str = phrase.ToLowerInvariant();
+        str = Regex.Replace(str, @"[^a-z0-9\s-]", ""); 
+        str = Regex.Replace(str, @"\s+", " ").Trim();   
+        str = Regex.Replace(str, @"\s", "-");          
+        str = Regex.Replace(str, @"-+", "-");           
+        return str;
+    }
+}
