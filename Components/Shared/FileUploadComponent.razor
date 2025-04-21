@@ -1,0 +1,270 @@
+﻿@* File: Components/Shared/FileUploadComponent.razor *@
+
+@* Inject services needed WITHIN the component *@
+@inject ILogger<FileUploadComponent> Logger
+@inject IConfiguration Configuration
+@inject ApplicationDbContext DbContext
+@inject NotificationService NotificationService
+
+@using System.ComponentModel.DataAnnotations
+@using System.IO
+@using System.Security
+@using Microsoft.AspNetCore.Components.Forms
+@using LehmanCustomConstruction.Data.Common // For CustomerDocument
+
+@* --- Upload Section --- *@
+<div class="bg-white dark:bg-gray-800 border border-subtle dark:border-gray-700 rounded-lg shadow-sm p-6 @CssClass">
+    <h4 class="text-xl font-semibold text-primary dark:text-gray-100 mb-4 font-serif">@Title</h4>
+
+    @* Upload Result Message *@
+    @if (!string.IsNullOrEmpty(_userFeedbackMessage))
+    {
+        <div class="@(_feedbackSuccess ? "bg-green-100 border border-green-400 text-green-700 dark:bg-green-900/50 dark:border-green-600 dark:text-green-300" : "bg-red-100 border border-red-400 text-red-700 dark:bg-red-900/50 dark:border-red-600 dark:text-red-300") px-4 py-3 rounded relative mb-4" role="alert">
+            <span class="block sm:inline">@((MarkupString)_userFeedbackMessage)</span>
+        </div>
+    }
+
+    @if (IsInDemoMode)
+    {
+        <p class="text-orange-600 dark:text-orange-400 mb-4"><em>Note: Running in demo mode without login. Uploads will be associated with demo user.</em></p>
+    }
+
+    <EditForm Model="_uploadModel" OnValidSubmit="HandleFileUpload">
+        <DataAnnotationsValidator />
+
+        @* File Input *@
+        <div class="mb-4">
+            <label for="@($"documentFile-{_componentId}")" class="block text-sm font-medium text-primary dark:text-gray-300 mb-1">Select File(s)</label>
+            <InputFile id="@($"documentFile-{_componentId}")" OnChange="HandleFileSelected" class="block w-full text-sm text-gray-500 dark:text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-accent/10 dark:file:bg-accent/20 file:text-accent dark:file:text-accent/90 hover:file:bg-accent/20 dark:hover:file:bg-accent/30" accept="@string.Join(",", _allowedExtensions)" multiple="@AllowMultipleFiles" />
+            <ValidationMessage For="@(() => _uploadModel.FilesToUpload)" class="text-red-600 dark:text-red-400 text-xs mt-1" />
+            @if (_isFileLoading)
+            {
+                <p class="text-sm text-blue-600 dark:text-blue-400 mt-1">Processing...</p>
+            }
+            else if (!AllowMultipleFiles && _uploadModel.FileToUpload != null)
+            {
+                <p class="mt-1 text-xs text-secondary dark:text-gray-400">Selected: @_uploadModel.FileToUpload.Name (@FormatFileSize(_uploadModel.FileToUpload.Size))</p>
+            }
+            else if (AllowMultipleFiles && _uploadModel.FilesToUpload.Any())
+            {
+                <p class="mt-1 text-xs text-secondary dark:text-gray-400">Selected: @_uploadModel.FilesToUpload.Count file(s)</p>
+            }
+            else
+            {
+                <p class="mt-1 text-xs text-secondary dark:text-gray-400">Max size: @(_maxFileSize / (1024 * 1024)) MB. Allowed: @string.Join(", ", _allowedExtensions.Select(ext => ext.ToUpperInvariant()))</p>
+            }
+        </div>
+
+        @* Description Input *@
+        @if (AllowDescription)
+        {
+            <div class="mb-4">
+                <label for="@($"description-{_componentId}")" class="block text-sm font-medium text-primary dark:text-gray-300 mb-1">Description (Optional)</label>
+                <InputText id="@($"description-{_componentId}")" @bind-Value="_uploadModel.Description" class="block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:border-accent focus:ring-accent sm:text-sm bg-white dark:bg-gray-700 text-primary dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500" placeholder="E.g., Renovation Plans v1" />
+                <ValidationMessage For="@(() => _uploadModel.Description)" class="text-red-600 dark:text-red-400 text-xs mt-1" />
+            </div>
+        }
+
+        @* Submit Button *@
+        <button type="submit" class="inline-flex items-center px-4 py-2 bg-accent border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-gray-800 focus:ring-accent disabled:opacity-50 disabled:cursor-not-allowed"
+                disabled="@(!_uploadModel.HasFiles(AllowMultipleFiles) || _isFileLoading || _isUploading || string.IsNullOrEmpty(TargetUserId) || string.IsNullOrEmpty(UploaderUserId))">
+            @if (_isUploading)
+            {
+                <span><svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-white inline" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>Uploading...</span>
+            }
+            else
+            {
+                <span><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5 -ml-1 mr-2 inline"><path fill-rule="evenodd" d="M10 3.75a.75.75 0 0 1 .75.75v6.19l1.72-1.72a.75.75 0 1 1 1.06 1.06l-3 3a.75.75 0 0 1-1.06 0l-3-3a.75.75 0 1 1 1.06-1.06l1.72 1.72V4.5a.75.75 0 0 1 .75-.75Z" clip-rule="evenodd" /><path fill-rule="evenodd" d="M5.5 17a.5.5 0 0 1 .5-.5h8a.5.5 0 0 1 0 1H6a.5.5 0 0 1-.5-.5Z" clip-rule="evenodd" /></svg>@UploadButtonText</span>
+            }
+        </button>
+    </EditForm>
+</div>
+
+@code {
+    // --- Parameters ---
+    [Parameter] public string TargetUserId { get; set; } = string.Empty;
+    [Parameter] public string UploaderUserId { get; set; } = string.Empty;
+    [Parameter] public string Title { get; set; } = "Upload New Document";
+    [Parameter] public string UploadButtonText { get; set; } = "Upload Document";
+    [Parameter] public bool AllowDescription { get; set; } = true;
+    [Parameter] public bool AllowMultipleFiles { get; set; } = false;
+    [Parameter] public string CssClass { get; set; } = "";
+    [Parameter] public bool IsInDemoMode { get; set; } = false;
+
+    // --- Event Callbacks ---
+    [Parameter] public EventCallback<List<CustomerDocument>> OnUploadComplete { get; set; }
+    [Parameter] public EventCallback<string> OnUploadError { get; set; }
+
+    // --- Internal State ---
+    private UploadModel _uploadModel = new();
+    private bool _isFileLoading = false;
+    private bool _isUploading = false;
+    private string? _userFeedbackMessage;
+    private bool _feedbackSuccess;
+    private readonly string _componentId = Guid.NewGuid().ToString("N");
+
+    // --- Config ---
+    private long _maxFileSize;
+    private string _baseUploadDirectory = string.Empty;
+    private readonly HashSet<string> _allowedExtensions = new(StringComparer.OrdinalIgnoreCase) { ".pdf", ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx", ".txt", ".csv", ".jpg", ".jpeg", ".png", ".gif", ".bmp", ".tif", ".tiff", ".webp" };
+
+    // --- ViewModel ---
+    private class UploadModel
+    {
+        [Required(ErrorMessage = "Please select at least one file.")]
+        [MinLength(1, ErrorMessage = "Please select at least one file.")]
+        public List<IBrowserFile> FilesToUpload { get; set; } = new();
+        public IBrowserFile? FileToUpload { get; set; } // Only used if AllowMultipleFiles is false
+        [StringLength(500)] public string? Description { get; set; }
+        public bool HasFiles(bool allowMultiple) => allowMultiple ? FilesToUpload.Any() : FileToUpload != null;
+    }
+
+    // --- Methods ---
+    protected override void OnInitialized()
+    {
+        _maxFileSize = Configuration.GetValue<long>("FileUploadSettings:MaxFileSizeMB", 20) * 1024 * 1024;
+        _baseUploadDirectory = Configuration["FileUploadSettings:BasePath"] ?? "";
+        if (string.IsNullOrWhiteSpace(_baseUploadDirectory) || !Path.IsPathRooted(_baseUploadDirectory))
+        {
+            Logger.LogError("FileUploadSettings:BasePath '{Path}' is missing, empty, or not absolute. Uploads will fail.", _baseUploadDirectory);
+            _baseUploadDirectory = ""; // Prevent usage of invalid path
+        }
+        else { Logger.LogInformation("FileUploadComponent Initialized. Base Path: {Path}", _baseUploadDirectory); }
+    }
+
+    private async Task HandleFileSelected(InputFileChangeEventArgs e)
+    {
+        _isFileLoading = true; _userFeedbackMessage = null; _uploadModel.FileToUpload = null; _uploadModel.FilesToUpload.Clear(); _feedbackSuccess = false;
+        await InvokeAsync(StateHasChanged);
+
+        List<IBrowserFile> selectedFiles = new();
+        if (AllowMultipleFiles) { selectedFiles.AddRange(e.GetMultipleFiles(100)); } else if (e.File != null) { selectedFiles.Add(e.File); }
+        if (!selectedFiles.Any()) { _userFeedbackMessage = "No file selected."; _feedbackSuccess = false; _isFileLoading = false; await InvokeAsync(StateHasChanged); return; }
+
+        List<IBrowserFile> validFiles = new();
+        foreach (var file in selectedFiles) { if (ValidateFile(file)) { validFiles.Add(file); } else { NotificationService.Notify(NotificationSeverity.Warning, "Invalid File", $"{file.Name}: {_userFeedbackMessage}"); } }
+
+        if (AllowMultipleFiles) { _uploadModel.FilesToUpload = validFiles; }
+        else { _uploadModel.FileToUpload = validFiles.FirstOrDefault(); }
+
+        if (!validFiles.Any()) { _userFeedbackMessage = "No valid files selected."; _feedbackSuccess = false; } else { _userFeedbackMessage = null; }
+
+        _isFileLoading = false; await InvokeAsync(StateHasChanged);
+    }
+
+    private async Task HandleFileUpload()
+    {
+        if (!_uploadModel.HasFiles(AllowMultipleFiles)) { /*...*/ return; }
+        if (_isFileLoading || _isUploading) return;
+        if (string.IsNullOrEmpty(TargetUserId) || string.IsNullOrEmpty(UploaderUserId)) { /*...*/ return; }
+        if (string.IsNullOrEmpty(_baseUploadDirectory)) { _userFeedbackMessage = "Upload config error."; _feedbackSuccess = false; NotificationService.Notify(NotificationSeverity.Error, "Config Error", "Base upload path not set."); await OnUploadError.InvokeAsync(_userFeedbackMessage); return; }
+
+        _isUploading = true; _userFeedbackMessage = null;
+        await InvokeAsync(StateHasChanged);
+
+        List<IBrowserFile> filesToProcess = AllowMultipleFiles ? _uploadModel.FilesToUpload : new List<IBrowserFile> { _uploadModel.FileToUpload! };
+        List<CustomerDocument> savedDocs = new();
+        bool anyError = false;
+        string? collectiveDescription = AllowDescription ? _uploadModel.Description?.Trim() : null;
+
+        foreach (var file in filesToProcess)
+        {
+            // --- Use a variable to store file size early ---
+            long currentFileSize = 0;
+            try { currentFileSize = file.Size; } // Access Size property safely
+            catch (Exception ex) { Logger.LogError(ex, "Error accessing file size for {FileName}", file.Name); anyError = true; NotificationService.Notify(NotificationSeverity.Error, $"File Error: {file.Name}", "Could not read file size."); continue; } // Skip this file if size cannot be read
+
+            // --- Re-validate with the size we just read ---
+            if (!ValidateFile(file, currentFileSize)) { anyError = true; continue; } // Skip if invalid
+
+            string userDirectory = Path.Combine(_baseUploadDirectory, TargetUserId);
+            string safeOriginalFileName = Path.GetFileName(file.Name);
+            string uniqueFileName = $"{Guid.NewGuid()}{Path.GetExtension(safeOriginalFileName)}";
+            string filePath = Path.Combine(userDirectory, uniqueFileName);
+            string? savedFilePath = null;
+
+            try
+            {
+                Directory.CreateDirectory(userDirectory);
+                var fullDirectoryPath = Path.GetFullPath(userDirectory);
+                var fullFilePath = Path.GetFullPath(filePath);
+                if (!fullFilePath.StartsWith(fullDirectoryPath, StringComparison.OrdinalIgnoreCase)) { throw new SecurityException($"Path error for {safeOriginalFileName}."); }
+
+                Logger.LogInformation("Saving '{Original}' (Size: {Size}) for {TargetUser} by {UploaderUser} to {Path}", safeOriginalFileName, currentFileSize, TargetUserId, UploaderUserId, filePath);
+                await using FileStream fs = new(filePath, FileMode.Create);
+                using var stream = file.OpenReadStream(_maxFileSize); // Use the configured max size limit here
+                await stream.CopyToAsync(fs);
+                savedFilePath = filePath;
+                Logger.LogInformation("Saved: {Path}", filePath);
+
+                // --- Create DB Record using the size read earlier ---
+                var document = new CustomerDocument
+                    {
+                        OriginalFileName = safeOriginalFileName,
+                        StoredFileName = uniqueFileName,
+                        ContentType = file.ContentType ?? "application/octet-stream",
+                        FileSize = currentFileSize, // <<< USE THE size READ EARLIER
+                        UploadTimestamp = DateTime.UtcNow,
+                        Description = collectiveDescription,
+                        UploadedById = UploaderUserId,
+                        TargetUserId = TargetUserId,
+                        IsDeleted = false
+                    };
+                DbContext.CustomerDocuments.Add(document);
+                await DbContext.SaveChangesAsync();
+                Logger.LogInformation("DB record created ID: {DocId}", document.Id);
+                savedDocs.Add(document);
+            }
+            catch (Exception ex) // Catch all exceptions for this file iteration
+            {
+                anyError = true;
+                Logger.LogError(ex, "Error uploading file '{Original}' for target {TargetUser}", safeOriginalFileName, TargetUserId);
+                _userFeedbackMessage = $"Error uploading {safeOriginalFileName}: {ex.Message}";
+                NotificationService.Notify(NotificationSeverity.Error, $"Upload Error: {safeOriginalFileName}", ex.Message);
+                TryDeleteFile(savedFilePath);
+            }
+        } // End foreach
+
+        _isUploading = false;
+        var descBeforeReset = _uploadModel.Description;
+        _uploadModel = new(); // Reset form model
+        _uploadModel.Description = descBeforeReset; // Restore description after reset
+
+        // --- Final Feedback & Event Callbacks ---
+        if (savedDocs.Any() && !anyError) { _userFeedbackMessage = $"{savedDocs.Count} file(s) uploaded successfully."; _feedbackSuccess = true; NotificationService.Notify(NotificationSeverity.Success, "Upload Complete", _userFeedbackMessage); await OnUploadComplete.InvokeAsync(savedDocs); }
+        else if (savedDocs.Any() && anyError) { _userFeedbackMessage = $"Partial success: {savedDocs.Count} uploaded, but some failed."; _feedbackSuccess = false; NotificationService.Notify(NotificationSeverity.Warning, "Partial Upload", _userFeedbackMessage); await OnUploadComplete.InvokeAsync(savedDocs); }
+        else if (anyError) { await OnUploadError.InvokeAsync(_userFeedbackMessage ?? "An unknown upload error occurred."); }
+        else { _userFeedbackMessage ??= "No valid files were selected to upload."; _feedbackSuccess = false; }
+
+        await InvokeAsync(StateHasChanged);
+    }
+
+    // --- Modified ValidateFile to accept size explicitly ---
+    private bool ValidateFile(IBrowserFile file, long fileSize)
+    {
+        if (file == null) { _userFeedbackMessage = "No file selected."; _feedbackSuccess = false; return false; }
+        if (fileSize == 0) { _userFeedbackMessage = $"Cannot upload empty file: {file.Name}."; _feedbackSuccess = false; return false; }
+        if (fileSize > _maxFileSize) { _userFeedbackMessage = $"File {file.Name} exceeds size limit ({FormatFileSize(_maxFileSize)})."; _feedbackSuccess = false; return false; }
+        var fileExtension = Path.GetExtension(file.Name);
+        if (string.IsNullOrEmpty(fileExtension) || !_allowedExtensions.Contains(fileExtension)) { _userFeedbackMessage = $"Invalid file type: {file.Name}. Allowed: {string.Join(", ", _allowedExtensions.Select(ext => ext.ToUpperInvariant()))}"; _feedbackSuccess = false; return false; }
+        _userFeedbackMessage = null; return true;
+    }
+
+    // Overload for HandleFileSelected which doesn't have the size readily available
+    private bool ValidateFile(IBrowserFile file)
+    {
+        long size = 0;
+        try { size = file.Size; } catch (Exception ex) { Logger.LogWarning(ex, "Could not access initial size for {FileName} during selection validation.", file?.Name ?? "unknown file"); /* Ignore size check here, rely on submit validation */ }
+        // Perform checks other than size if size access failed
+        if (file == null) { _userFeedbackMessage = "No file selected."; _feedbackSuccess = false; return false; }
+        var fileExtension = Path.GetExtension(file.Name);
+        if (string.IsNullOrEmpty(fileExtension) || !_allowedExtensions.Contains(fileExtension)) { _userFeedbackMessage = $"Invalid file type: {file.Name}. Allowed: {string.Join(", ", _allowedExtensions.Select(ext => ext.ToUpperInvariant()))}"; _feedbackSuccess = false; return false; }
+        // Re-check size if it was accessible
+        if (size > 0 && size > _maxFileSize) { _userFeedbackMessage = $"File {file.Name} exceeds size limit ({FormatFileSize(_maxFileSize)})."; _feedbackSuccess = false; return false; }
+
+        _userFeedbackMessage = null; return true; // Assume valid if extension is okay and size wasn't checked or was okay
+    }
+
+    private void TryDeleteFile(string? filePath) { if (filePath != null && File.Exists(filePath)) { try { File.Delete(filePath); Logger.LogWarning("Cleaned up file '{FilePath}' due to upload error.", filePath); } catch (Exception delEx) { Logger.LogError(delEx, "Failed to clean up file '{FilePath}' after upload error.", filePath); } } }
+    private string FormatFileSize(long bytes) { const long k = 1024, m = k * k, g = m * k; if (bytes < 0) return "?"; if (bytes == 0) return "0 B"; if (bytes < k) return $"{bytes} B"; if (bytes < m) return $"{(double)bytes / k:F1} KB"; if (bytes < g) return $"{(double)bytes / m:F1} MB"; return $"{(double)bytes / g:F1} GB"; }
+}

@@ -17,31 +17,34 @@ using System.Security.Claims;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using System.IO;
-// REMOVE using statement for DemoAuthStateProvider if you added one
+// No DemoAuthStateProvider needed
 
 var builder = WebApplication.CreateBuilder(args);
 
 // --- START: Service Registration ---
 
+// <<< ADD API Controller Services >>>
+builder.Services.AddControllers();
+
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents(options =>
     {
-        options.DetailedErrors = true;
+        options.DetailedErrors = true; // Enable detailed errors for circuits
     });
 
 // --- Core Blazor & Identity Services ---
 builder.Services.AddCascadingAuthenticationState();
 builder.Services.AddScoped<IdentityUserAccessor>();
 builder.Services.AddScoped<IdentityRedirectManager>();
-// --- Restore Standard AuthenticationStateProvider ---
+// --- Use Standard AuthenticationStateProvider ---
 builder.Services.AddScoped<AuthenticationStateProvider, IdentityRevalidatingAuthenticationStateProvider>();
-// --- END Restore ---
 
 // --- Antiforgery Service ---
+// Note: API Controllers might need specific antiforgery token handling if not using Blazor forms
 builder.Services.AddAntiforgery();
 
 // --- HttpContextAccessor ---
-builder.Services.AddHttpContextAccessor();
+builder.Services.AddHttpContextAccessor(); // Useful for API controllers too
 
 // --- Bind EmailSettings Configuration ---
 builder.Services.Configure<EmailSettings>(builder.Configuration.GetSection("EmailSettings"));
@@ -80,7 +83,7 @@ builder.Services.AddIdentityCore<ApplicationUser>(options => options.SignIn.Requ
 builder.Services.AddSingleton<IEmailSender<ApplicationUser>, IdentityNoOpEmailSender>();
 
 // --- Radzen Services ---
-builder.Services.AddRadzenComponents();
+builder.Services.AddRadzenComponents(); // Includes DialogService, NotificationService etc.
 
 // --- HttpClient (Example) ---
 // builder.Services.AddHttpClient(...);
@@ -106,10 +109,11 @@ app.UseHttpsRedirection();
 app.UseStaticFiles();
 app.UseRouting();
 
-// Keep Auth middleware, but endpoints/pages won't require it
+// Keep Auth middleware
 app.UseAuthentication();
 app.UseAuthorization();
 
+// Keep Antiforgery middleware
 app.UseAntiforgery();
 
 // --- Endpoint Mapping ---
@@ -118,46 +122,39 @@ app.MapRazorComponents<App>()
 
 app.MapAdditionalIdentityEndpoints();
 
-// --- File Download Minimal API Endpoint ---
-// WARNING: Authentication/Authorization DISABLED for DEMO
+// <<< MAP API CONTROLLERS >>>
+// This line enables routing to your UploadController actions
+app.MapControllers();
+
+// --- File Download Minimal API Endpoint (Auth Disabled for Demo) ---
 app.MapGet("/download/{id:int}", async (
     int id,
-    // HttpContext httpContext, // Don't need HttpContext if not checking user
     ApplicationDbContext dbContext,
     IConfiguration configuration,
     ILogger<Program> logger) =>
 {
-    // --- REMOVED ALL AUTH CHECKS ---
+    // ... (Download logic with auth checks removed, as provided before) ...
     logger.LogWarning("DEMO MODE: Download endpoint accessed anonymously for document ID {DocumentId}. RE-ENABLE AUTH!", id);
-
-    var document = await dbContext.CustomerDocuments.FirstOrDefaultAsync(d => d.Id == id && !d.IsDeleted); // Still check IsDeleted
+    var document = await dbContext.CustomerDocuments.FirstOrDefaultAsync(d => d.Id == id && !d.IsDeleted);
     if (document == null) { return Results.NotFound($"Document with ID {id} not found or marked as deleted."); }
-
-    // --- SECURITY RISK: No check on who can download what ---
-
     var basePath = configuration["FileUploadSettings:BasePath"];
     if (string.IsNullOrWhiteSpace(basePath)) { logger.LogError("FileUploadSettings:BasePath not configured."); return Results.Problem("Server configuration error: Upload path not set."); }
-
-    // --- SECURITY: Use TARGET user ID for directory structure ---
     string userDirectory = Path.Combine(basePath, document.TargetUserId ?? "_unknown_user");
     string filePath = Path.Combine(userDirectory, document.StoredFileName);
-    // --- END SECURITY ---
-
-    // --- Path Traversal / Invalid Char Checks (Keep These) ---
     var fullBasePath = Path.GetFullPath(basePath);
     var fullFilePath = Path.GetFullPath(filePath);
     if (!fullFilePath.StartsWith(fullBasePath, StringComparison.OrdinalIgnoreCase)) { logger.LogError("Potential Path Traversal Attack: Document {DocumentId}, Path {FilePath}", id, filePath); return Results.BadRequest("Invalid file path."); }
     if (document.StoredFileName.Contains("..") || document.StoredFileName.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0) { logger.LogError("Invalid StoredFileName detected: Document {DocumentId}, FileName {FileName}", id, document.StoredFileName); return Results.BadRequest("Invalid stored filename."); }
-    // --- End Checks ---
-
     if (!File.Exists(filePath)) { logger.LogWarning("File not found on server for Document ID {DocumentId}, Path: {FilePath}", id, filePath); return Results.NotFound($"File associated with document ID {id} not found on server."); }
-
     logger.LogInformation("DEMO MODE: Serving file for Document ID {DocumentId}. Path: {FilePath}", id, filePath);
     return Results.File(filePath, document.ContentType ?? "application/octet-stream", document.OriginalFileName);
-
-}); // <<< REMOVED .RequireAuthorization() <<<
+}); // No .RequireAuthorization()
 // --- End File Download Endpoint ---
 
 // --- END: Middleware Pipeline Configuration ---
 
 app.Run();
+
+// Public record for Minimal API DTO (if needed elsewhere, otherwise can be local)
+// Remove if not used by any Minimal API:
+// public record LoginRequestDto(string Email, string Password, bool RememberMe);

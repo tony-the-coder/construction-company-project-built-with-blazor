@@ -11,24 +11,25 @@
 @using System.ComponentModel.DataAnnotations
 @using System.IO
 @using System.Security
-@using Microsoft.AspNetCore.Authorization 
+@using Microsoft.AspNetCore.Authorization
 @using Microsoft.AspNetCore.Components.Authorization
 @using Microsoft.AspNetCore.Components.Forms
 @using Microsoft.EntityFrameworkCore
 @using Microsoft.Extensions.Configuration
 @using Microsoft.Extensions.Logging
-@using Radzen
-@using Radzen.Blazor
-@using LehmanCustomConstruction.Data
-@using LehmanCustomConstruction.Data.Common
+@using Radzen // For NotificationService etc.
+@using Radzen.Blazor // For RadzenDataGrid, RadzenLink etc.
+@using LehmanCustomConstruction.Data 
+@using LehmanCustomConstruction.Data.Common  
+@using LehmanCustomConstruction.Components.Shared  
 
 @* Service Injections *@
 @inject ILogger<DocumentsPage> Logger
 @inject IConfiguration Configuration
-@inject AuthenticationStateProvider AuthenticationStateProvider 
+@inject AuthenticationStateProvider AuthenticationStateProvider
 @inject ApplicationDbContext DbContext
 @inject NavigationManager NavigationManager
-@inject NotificationService NotificationService
+@inject NotificationService NotificationService // Inject for user feedback
 
 
 <PageTitle>My Documents | Lehman Custom Construction</PageTitle>
@@ -36,81 +37,64 @@
 <h3 class="text-2xl font-semibold text-primary dark:text-gray-100 mb-6 font-serif">Project Documents</h3>
 
 @* --- Upload Section --- *@
-<div class="bg-white dark:bg-gray-800 border border-subtle dark:border-gray-700 rounded-lg shadow-sm p-6 mb-8">
-    <h4 class="text-xl font-semibold text-primary dark:text-gray-100 mb-4 font-serif">Upload New Document</h4>
-
-    @* Upload Result Message *@
-    @if (!string.IsNullOrEmpty(_userFeedbackMessage)) { <div class="@(_feedbackSuccess ? "bg-green-100..." : "bg-red-100...")" role="alert"><span class="block sm:inline">@((MarkupString)_userFeedbackMessage)</span></div> }
-
-     @* Demo Mode Message *@
-    @if (_isInDemoMode) { <p class="text-orange-600 dark:text-orange-400 mb-4"><em>Note: Running in demo mode without login. Uploads will be associated with demo user.</em></p> }
-
-    <EditForm Model="_uploadModel" OnValidSubmit="HandleFileUpload">
-        <DataAnnotationsValidator />
-        <!-- File Input -->
-        <div class="mb-4">
-            <label for="documentFile" class="block text-sm font-medium text-primary dark:text-gray-300 mb-1">Select File</label>
-            <InputFile id="documentFile" OnChange="HandleFileSelected" class="block w-full text-sm text-gray-500..." accept="@string.Join(",", _allowedExtensions)" />
-            <ValidationMessage For="@(() => _uploadModel.FileToUpload)" class="text-red-600..." />
-            @if (_isFileLoading) { <p class="text-sm text-blue-600...">Processing...</p> }
-            else if (_uploadModel.FileToUpload != null) { <p class="mt-1 text-xs text-secondary...">Selected: @_uploadModel.FileToUpload.Name (@FormatFileSize(_uploadModel.FileToUpload.Size))</p> }
-            else { <p class="mt-1 text-xs text-secondary...">Max size: @(_maxFileSize / (1024*1024)) MB. Allowed: @string.Join(", ", _allowedExtensions.Select(ext => ext.ToUpperInvariant()))</p> }
-        </div>
-        <!-- Description Input -->
-        <div class="mb-4">
-            <label for="description" class="block text-sm font-medium text-primary dark:text-gray-300 mb-1">Description (Optional)</label>
-            <InputText id="description" @bind-Value="_uploadModel.Description" class="block w-full rounded-md..." placeholder="E.g., Renovation Plans v1" />
-            <ValidationMessage For="@(() => _uploadModel.Description)" class="text-red-600..." />
-        </div>
-        <!-- Submit Button -->
-        <button type="submit" class="inline-flex items-center px-4 py-2 bg-accent..." disabled="@(_uploadModel.FileToUpload == null || _isFileLoading || _isUploading || string.IsNullOrEmpty(_currentUserId))">
-            @if (_isUploading) { <!-- Uploading SVG --><span>Uploading...</span> } else { <!-- Upload SVG --><span>Upload Document</span> }
-        </button>
-    </EditForm>
-</div>
+@* Using the reusable component - Comment removed from inside tag *@
+<FileUploadComponent TargetUserId="@_currentUserId"
+                     UploaderUserId="@_currentUserId" @* Customer uploads for themselves *@
+                     AllowMultipleFiles="true"
+                     AllowDescription="true"
+                     Title="Upload New Document(s)"
+                     UploadButtonText="Upload Selected Files"
+                     CssClass="mb-8"
+                     IsInDemoMode="@_isInDemoMode"
+                     OnUploadComplete="@HandleUploadCompletion"
+                     OnUploadError="@HandleUploadError" />
 
 @* --- Uploaded Documents List --- *@
 <div class="bg-white dark:bg-gray-800 border border-subtle dark:border-gray-700 rounded-lg shadow-sm p-6">
     <h4 class="text-xl font-semibold text-primary dark:text-gray-100 mb-4 font-serif">My Documents</h4>
-    @if (_isLoadingDocuments) { <RadzenProgressBar Value="100" ShowValue="false" Mode="ProgressBarMode.Indeterminate" Style="margin-bottom: 20px" /><p class="text-secondary...">Loading documents...</p> }
-    else if (_userDocuments == null || !_userDocuments.Any()) { <p class="text-secondary dark:text-gray-400">No documents found for the demo user account.</p> }
-    else {
-        <RadzenDataGrid Data="@_userDocuments" TItem="CustomerDocument" AllowSorting="true" AllowPaging="true" PageSize="10" PagerHorizontalAlign="HorizontalAlign.Left" ShowPagingSummary="true" PagerAlwaysVisible="true" PageSizeOptions="new int[] { 5, 10, 20 }" Density="Density.Compact" Style="width: 100%;" EmptyText="No documents found." IsLoading="@_isLoadingDocuments">
+    @if (_isLoadingDocuments)
+    {
+        <RadzenProgressBar Value="100" ShowValue="false" Mode="ProgressBarMode.Indeterminate" Style="margin-bottom: 20px" />
+        <p class="text-secondary dark:text-gray-400">Loading documents...</p>
+    }
+    else if (_userDocuments == null || !_userDocuments.Any())
+    {
+        <p class="text-secondary dark:text-gray-400">No documents have been uploaded for your account yet.</p>
+    }
+    else
+    {
+        <RadzenDataGrid Data="@_userDocuments" TItem="CustomerDocument" AllowSorting="true" AllowPaging="true" PageSize="10"
+                        PagerHorizontalAlign="HorizontalAlign.Left" ShowPagingSummary="true" PagerAlwaysVisible="true" PageSizeOptions="new int[] { 5, 10, 20 }"
+                        Density="Density.Compact" Style="width: 100%;" EmptyText="No documents found." IsLoading="@_isLoadingDocuments">
             <Columns>
-                <!-- Grid Columns Unchanged -->
                 <RadzenDataGridColumn TItem="CustomerDocument" Property="OriginalFileName" Title="File Name" Width="250px" />
                 <RadzenDataGridColumn TItem="CustomerDocument" Property="Description" Title="Description" />
                 <RadzenDataGridColumn TItem="CustomerDocument" Property="UploadTimestamp" Title="Uploaded On" FormatString="{0:yyyy-MM-dd HH:mm}" Width="180px" TextAlign="TextAlign.Center" />
-                <RadzenDataGridColumn TItem="CustomerDocument" Title="Size" Property="FileSize" Sortable="true" Filterable="false" Width="120px" TextAlign="TextAlign.Right"><Template Context="doc">@FormatFileSize(doc.FileSize)</Template></RadzenDataGridColumn>
-                <RadzenDataGridColumn TItem="CustomerDocument" Title="Download" Sortable="false" Filterable="false" Width="100px" TextAlign="TextAlign.Center"><Template Context="doc"><RadzenLink Path="@($"/download/{doc.Id}")" Text="Download" Target="_blank" Icon="download" /></Template></RadzenDataGridColumn>
+                <RadzenDataGridColumn TItem="CustomerDocument" Title="Size" Property="FileSize" Sortable="true" Filterable="false" Width="120px" TextAlign="TextAlign.Right">
+                    <Template Context="doc">
+                        @FormatFileSize(doc.FileSize)
+                    </Template>
+                </RadzenDataGridColumn>
+                <RadzenDataGridColumn TItem="CustomerDocument" Title="Download" Sortable="false" Filterable="false" Width="100px" TextAlign="TextAlign.Center">
+                    <Template Context="doc">
+                        <RadzenLink Path="@($"/download/{doc.Id}")" Text="Download" Target="_blank" Icon="download" />
+                    </Template>
+                </RadzenDataGridColumn>
             </Columns>
         </RadzenDataGrid>
     }
 </div>
 
 @code {
-    // --- Form Model ---
-    private UploadModel _uploadModel = new();
-
     // --- Component State ---
-    private bool _isFileLoading = false;
-    private bool _isUploading = false;
     private bool _isLoadingDocuments = true;
-    private string? _userFeedbackMessage;
-    private bool _feedbackSuccess;
     private bool _isInDemoMode = false; // Flag to indicate demo mode
 
     // --- Data ---
     private List<CustomerDocument> _userDocuments = new();
-    private string? _currentUserId; // May be hardcoded for demo
+    private string? _currentUserId; // Determined in OnInitialized
 
-    // --- Configuration Values ---
-    private long _maxFileSize;
-    private string _baseUploadDirectory = string.Empty;
-    private readonly HashSet<string> _allowedExtensions = new(StringComparer.OrdinalIgnoreCase) { ".pdf", ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx", ".txt", ".csv", ".jpg", ".jpeg", ".png", ".gif", ".bmp", ".tif", ".tiff", ".webp" };
-
-    // --- ViewModel for the Upload Form ---
-    private class UploadModel { [Required(ErrorMessage = "Please select a file.")] public IBrowserFile? FileToUpload { get; set; } [StringLength(500)] public string? Description { get; set; } }
+    // --- REMOVED OLD UPLOAD VARIABLES ---
 
     // --- Lifecycle Method ---
     protected override async Task OnInitializedAsync()
@@ -119,19 +103,19 @@
         _isInDemoMode = false; // Reset flag
         await InvokeAsync(StateHasChanged);
 
-        // Load configuration
-        _maxFileSize = Configuration.GetValue<long>("FileUploadSettings:MaxFileSizeMB", 20) * 1024 * 1024;
-        _baseUploadDirectory = Configuration["FileUploadSettings:BasePath"] ?? Path.Combine("wwwroot", "user_uploads");
-        if (string.IsNullOrWhiteSpace(Configuration["FileUploadSettings:BasePath"])) { Logger.LogWarning("FileUploadSettings:BasePath not configured. Using default: '{DefaultPath}'", _baseUploadDirectory); }
+        // Load configuration needed for other parts maybe? Keep config injection if needed.
+        // _maxFileSize = Configuration.GetValue<long>("FileUploadSettings:MaxFileSizeMB", 20) * 1024 * 1024;
+        // _baseUploadDirectory = Configuration["FileUploadSettings:BasePath"] ?? Path.Combine("wwwroot", "user_uploads");
+        // if (string.IsNullOrWhiteSpace(Configuration["FileUploadSettings:BasePath"])) { Logger.LogWarning("FileUploadSettings:BasePath not configured."); }
 
-        // Get auth state but don't redirect
+        // Get auth state
         var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
         var user = authState.User;
 
         if (user.Identity?.IsAuthenticated ?? false)
         {
              _currentUserId = user.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
-             Logger.LogInformation("User is authenticated. User ID: {UserId}", _currentUserId);
+             Logger.LogInformation("User authenticated. User ID: {UserId}", _currentUserId);
         }
         else
         {
@@ -139,36 +123,64 @@
              _currentUserId = "683a96be-9b4a-4af7-a863-b98a88815cae"; // User test4@test.com's ID
              _isInDemoMode = true; // Set demo flag
              Logger.LogWarning("User not authenticated. DEMO MODE: Using hardcoded User ID: {UserId}", _currentUserId);
-             // --- END DEMO MODE ---
         }
 
         if (string.IsNullOrEmpty(_currentUserId))
         {
             Logger.LogError("Could not determine User ID. Cannot load or upload documents.");
-            _userFeedbackMessage = "Error: Unable to identify the user account.";
-            _feedbackSuccess = false;
             _isLoadingDocuments = false;
             await InvokeAsync(StateHasChanged);
+            // Maybe redirect or show permanent error?
+             NotificationService.Notify(NotificationSeverity.Error, "Error", "Could not identify user account.");
+             // NavigationManager.NavigateTo("/Error?message=UserIdentificationFailed", forceLoad: true); // Example redirect
             return;
         }
 
         await LoadUserDocuments(); // Load documents
 
         _isLoadingDocuments = false;
-        await InvokeAsync(StateHasChanged);
+        await InvokeAsync(StateHasChanged); // Final UI update after loading
     }
 
     // --- Data Loading Method ---
-    private async Task LoadUserDocuments() { /* ... Same logic as before ... */ if (string.IsNullOrEmpty(_currentUserId)) { Logger.LogWarning("LoadUserDocuments called without a valid _currentUserId."); _userDocuments = new List<CustomerDocument>(); return; } _isLoadingDocuments = true; await InvokeAsync(StateHasChanged); try { _userDocuments = await DbContext.CustomerDocuments.Where(d => d.TargetUserId == _currentUserId && !d.IsDeleted).OrderByDescending(d => d.UploadTimestamp).AsNoTracking().ToListAsync(); Logger.LogInformation("Loaded {Count} documents for user {UserId}", _userDocuments.Count, _currentUserId); } catch (Exception ex) { Logger.LogError(ex, "Error retrieving documents for user {UserId}", _currentUserId); _userDocuments = new List<CustomerDocument>(); NotificationService.Notify(NotificationSeverity.Error, "Load Error", "Could not retrieve document list."); } finally { _isLoadingDocuments = false; } }
+    private async Task LoadUserDocuments()
+    {
+        if (string.IsNullOrEmpty(_currentUserId)) { Logger.LogWarning("LoadUserDocuments called without a valid _currentUserId."); _userDocuments = new List<CustomerDocument>(); return; }
+        _isLoadingDocuments = true;
+        await InvokeAsync(StateHasChanged);
+        try
+        {
+            _userDocuments = await DbContext.CustomerDocuments
+                .Where(d => d.TargetUserId == _currentUserId && !d.IsDeleted)
+                .OrderByDescending(d => d.UploadTimestamp)
+                .AsNoTracking()
+                .ToListAsync();
+            Logger.LogInformation("Loaded {Count} documents for user {UserId}", _userDocuments.Count, _currentUserId);
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error retrieving documents for user {UserId}", _currentUserId);
+            _userDocuments = new List<CustomerDocument>(); // Ensure empty list on error
+            NotificationService.Notify(NotificationSeverity.Error, "Load Error", "Could not retrieve document list.");
+        }
+        finally { _isLoadingDocuments = false; } // Grid IsLoading handles UI
+    }
 
-    // --- File Input Handling ---
-    private async Task HandleFileSelected(InputFileChangeEventArgs e) { /* ... Same logic ... */ _isFileLoading = true; _userFeedbackMessage = null; _uploadModel.FileToUpload = null; _feedbackSuccess = false; await InvokeAsync(StateHasChanged); try { if (e.File != null) { if (ValidateFile(e.File)) { _uploadModel.FileToUpload = e.File; _userFeedbackMessage = null; } } else { _userFeedbackMessage = "No file selected."; _feedbackSuccess = false; } } catch (Exception ex) { Logger.LogError(ex, "Error during file selection."); _userFeedbackMessage = $"Error selecting file: {ex.Message}"; _feedbackSuccess = false; } finally { _isFileLoading = false; await InvokeAsync(StateHasChanged); } }
+    // --- File Upload Component Event Handlers ---
+    private async Task HandleUploadCompletion(List<CustomerDocument> savedDocs)
+    {
+        Logger.LogInformation("Portal page received {Count} uploaded documents for user {UserId}.", savedDocs.Count, _currentUserId);
+        await LoadUserDocuments(); // Refresh the grid
+        // Notification already shown by component
+        await InvokeAsync(StateHasChanged); // Ensure grid refresh updates UI if needed
+    }
 
-    // --- File Upload Submission ---
-    private async Task HandleFileUpload() { /* ... Same logic (uses _currentUserId) ... */ if (_uploadModel.FileToUpload == null) { _userFeedbackMessage = "Please select a valid file first."; _feedbackSuccess = false; NotificationService.Notify(NotificationSeverity.Warning, "No File Selected", _userFeedbackMessage); return; } if (_isFileLoading || _isUploading) return; if (!ValidateFile(_uploadModel.FileToUpload)) { await InvokeAsync(StateHasChanged); return; } _isUploading = true; _userFeedbackMessage = null; await InvokeAsync(StateHasChanged); if (string.IsNullOrEmpty(_currentUserId)) { _userFeedbackMessage = "Cannot upload: User context is missing."; _feedbackSuccess = false; _isUploading = false; NotificationService.Notify(NotificationSeverity.Error, "Upload Error", "User ID is missing."); await InvokeAsync(StateHasChanged); return; } string userDirectory = Path.Combine(_baseUploadDirectory, _currentUserId); string safeOriginalFileName = Path.GetFileName(_uploadModel.FileToUpload.Name); string uniqueFileName = $"{Guid.NewGuid()}{Path.GetExtension(safeOriginalFileName)}"; string filePath = Path.Combine(userDirectory, uniqueFileName); string? savedFilePath = null; try { Directory.CreateDirectory(userDirectory); var fullDirectoryPath = Path.GetFullPath(userDirectory); var fullFilePath = Path.GetFullPath(filePath); if (!fullFilePath.StartsWith(fullDirectoryPath, StringComparison.OrdinalIgnoreCase)) { throw new SecurityException("Calculated file path is outside the allowed user directory."); } Logger.LogInformation("Attempting to save file for user {UserId} to {FilePath}", _currentUserId, filePath); await using FileStream fs = new(filePath, FileMode.Create); using var stream = _uploadModel.FileToUpload.OpenReadStream(_maxFileSize); await stream.CopyToAsync(fs); savedFilePath = filePath; Logger.LogInformation("File saved successfully to {FilePath}", filePath); var document = new CustomerDocument { OriginalFileName = safeOriginalFileName, StoredFileName = uniqueFileName, ContentType = _uploadModel.FileToUpload.ContentType ?? "application/octet-stream", FileSize = _uploadModel.FileToUpload.Size, UploadTimestamp = DateTime.UtcNow, Description = _uploadModel.Description?.Trim(), UploadedById = _currentUserId, TargetUserId = _currentUserId, IsDeleted = false }; DbContext.CustomerDocuments.Add(document); await DbContext.SaveChangesAsync(); Logger.LogInformation("DB record created for file {OriginalFile}, ID: {DocumentId}", safeOriginalFileName, document.Id); await LoadUserDocuments(); _userFeedbackMessage = $"File '{safeOriginalFileName}' uploaded successfully."; _feedbackSuccess = true; NotificationService.Notify(NotificationSeverity.Success, "Upload Complete", _userFeedbackMessage); _uploadModel = new(); } catch (IOException ioEx) when (ioEx.Message.Contains("size")) { Logger.LogWarning(ioEx, "Upload failed for user {UserId} (size limit).", _currentUserId); _userFeedbackMessage = $"Error: Exceeded size limit ({FormatFileSize(_maxFileSize)})."; _feedbackSuccess = false; TryDeleteFile(savedFilePath); } catch (IOException ioEx) { Logger.LogError(ioEx, "IO error during upload for user {UserId}", _currentUserId); _userFeedbackMessage = $"Error saving file: {ioEx.Message}"; _feedbackSuccess = false; TryDeleteFile(savedFilePath); } catch (UnauthorizedAccessException authEx) { Logger.LogError(authEx, "Permission error for user {UserId} writing to {UserDirectory}", _currentUserId, userDirectory); _userFeedbackMessage = "Server error: Unable to save file (permissions)."; _feedbackSuccess = false; } catch (DbUpdateException dbEx) { Logger.LogError(dbEx, "DB error saving record for user {UserId}. Inner: {Inner}", _currentUserId, dbEx.InnerException?.Message); _userFeedbackMessage = $"Server error: Could not save document info."; _feedbackSuccess = false; TryDeleteFile(savedFilePath); } catch (SecurityException secEx) { Logger.LogError(secEx, "Security error during upload for user {UserId}.", _currentUserId); _userFeedbackMessage = $"Server security error: {secEx.Message}"; _feedbackSuccess = false; } catch (Exception ex) { Logger.LogError(ex, "Unexpected error during upload for user {UserId}", _currentUserId); _userFeedbackMessage = $"An unexpected error occurred."; _feedbackSuccess = false; TryDeleteFile(savedFilePath); } finally { _isUploading = false; await InvokeAsync(StateHasChanged); } }
+    private void HandleUploadError(string errorMessage)
+    {
+        Logger.LogError("Portal page received upload error for user {UserId}: {Error}", _currentUserId, errorMessage);
+        // Notification already shown by component
+    }
 
     // --- Helper Methods ---
-    private bool ValidateFile(IBrowserFile file) { /* ... Same logic ... */ if (file == null) { _userFeedbackMessage = "No file selected."; _feedbackSuccess = false; return false; } if (file.Size == 0) { _userFeedbackMessage = "Cannot upload an empty file."; _feedbackSuccess = false; return false; } if (file.Size > _maxFileSize) { _userFeedbackMessage = $"File size exceeds limit ({FormatFileSize(_maxFileSize)})."; _feedbackSuccess = false; return false; } var fileExtension = Path.GetExtension(file.Name); if (string.IsNullOrEmpty(fileExtension) || !_allowedExtensions.Contains(fileExtension)) { _userFeedbackMessage = $"Invalid file type. Allowed: {string.Join(", ", _allowedExtensions.Select(ext => ext.ToUpperInvariant()))}"; _feedbackSuccess = false; return false; } _userFeedbackMessage = null; return true; }
-    private void TryDeleteFile(string? filePath) { /* ... Same logic ... */ if (filePath != null && File.Exists(filePath)) { try { File.Delete(filePath); Logger.LogWarning("Cleaned up file '{FilePath}' due to upload error.", filePath); } catch (Exception delEx) { Logger.LogError(delEx, "Failed to clean up file '{FilePath}' after upload error.", filePath); } } }
-    private string FormatFileSize(long bytes) { /* ... Same logic ... */ const long k=1024,m=k*k,g=m*k;if(bytes<0)return "?";if(bytes==0)return "0 B";if(bytes<k)return $"{bytes} B";if(bytes<m)return $"{(double)bytes/k:F1} KB";if(bytes<g)return $"{(double)bytes/m:F1} MB";return $"{(double)bytes/g:F1} GB"; }
+    private string FormatFileSize(long bytes) { const long k=1024,m=k*k,g=m*k;if(bytes<0)return "?";if(bytes==0)return "0 B";if(bytes<k)return $"{bytes} B";if(bytes<m)return $"{(double)bytes/k:F1} KB";if(bytes<g)return $"{(double)bytes/m:F1} MB";return $"{(double)bytes/g:F1} GB"; }
 }
