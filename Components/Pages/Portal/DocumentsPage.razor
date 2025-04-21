@@ -11,17 +11,18 @@
 @using System.ComponentModel.DataAnnotations
 @using System.IO
 @using System.Security
+@using System.Text.Json;
+@using System.Net.Http;  
 @using Microsoft.AspNetCore.Authorization
 @using Microsoft.AspNetCore.Components.Authorization
 @using Microsoft.AspNetCore.Components.Forms
 @using Microsoft.EntityFrameworkCore
 @using Microsoft.Extensions.Configuration
 @using Microsoft.Extensions.Logging
-@using Radzen // For NotificationService etc.
-@using Radzen.Blazor // For RadzenDataGrid, RadzenLink etc.
-@using LehmanCustomConstruction.Data 
-@using LehmanCustomConstruction.Data.Common  
-@using LehmanCustomConstruction.Components.Shared  
+@using Radzen
+@using Radzen.Blazor
+@using LehmanCustomConstruction.Data
+@using LehmanCustomConstruction.Data.Common
 
 @* Service Injections *@
 @inject ILogger<DocumentsPage> Logger
@@ -29,57 +30,49 @@
 @inject AuthenticationStateProvider AuthenticationStateProvider
 @inject ApplicationDbContext DbContext
 @inject NavigationManager NavigationManager
-@inject NotificationService NotificationService // Inject for user feedback
+@inject NotificationService NotificationService
 
+@* --- CSS STYLES FOR DRAG & DROP ZONE --- *@
+<style>
+    #customerUploadWithDragAndDrop { min-height: 200px; border: 2px dashed var(--rz-border-base-color, #dee2e6); /*...*/ }
+    #customerUploadWithDragAndDrop.rz-fileupload-highlight { background-color: var(--rz-primary-lighter, #cfe2ff) !important; /*...*/ }
+    #customerUploadWithDragAndDrop .rz-fileupload-choose { background-color: transparent !important; /*...*/ }
+    #customerUploadWithDragAndDrop .rz-fileupload-choose span { margin: 0 !important; }
+    #customerUploadWithDragAndDrop .rz-fileupload-content { padding: 0.5rem; border: none; }
+    #customerUploadWithDragAndDrop .rz-fileupload-row > div { padding: 0.3rem 0.5rem; }
+    #customerUploadWithDragAndDrop .rz-progressbar { height: 6px; }
+</style>
 
 <PageTitle>My Documents | Lehman Custom Construction</PageTitle>
 
 <h3 class="text-2xl font-semibold text-primary dark:text-gray-100 mb-6 font-serif">Project Documents</h3>
 
-@* --- Upload Section --- *@
-@* Using the reusable component - Comment removed from inside tag *@
-<FileUploadComponent TargetUserId="@_currentUserId"
-                     UploaderUserId="@_currentUserId" @* Customer uploads for themselves *@
-                     AllowMultipleFiles="true"
-                     AllowDescription="true"
-                     Title="Upload New Document(s)"
-                     UploadButtonText="Upload Selected Files"
-                     CssClass="mb-8"
-                     IsInDemoMode="@_isInDemoMode"
-                     OnUploadComplete="@HandleUploadCompletion"
-                     OnUploadError="@HandleUploadError" />
+@* --- Upload Section (Using RadzenUpload) --- *@
+<RadzenCard Variant="Variant.Outlined" class="mb-8">
+    <RadzenText TextStyle="TextStyle.Subtitle2" TagName="TagName.H3" class="mb-4">Upload New Document(s) (Drag & Drop)</RadzenText>
+    @if (_isInDemoMode) { <p class="text-orange-600 dark:text-orange-400 mb-4"><em>Note: Running in demo mode without login. Uploads will be associated with demo user.</em></p> }
+    <RadzenUpload id="customerUploadWithDragAndDrop" @ref="uploadComponent"
+                  ChooseText="Drag and Drop files here or Click to Browse"
+                  Accept="@_allowedExtensionsString" Url="/api/upload/customer" Multiple="true" Auto="false"
+                  Style="width: 100%; margin-bottom: 1rem;" InputAttributes="@(new Dictionary<string,object>(){ { "aria-label", "select file" }})"
+                  Progress=@OnUploadProgress Complete=@OnUploadComplete Error=@OnUploadError />
+    <RadzenButton Text="Upload Selected Files" Click=@TriggerUpload class="rz-mt-2" ButtonStyle="ButtonStyle.Success" Icon="upload" IsBusy=@isUploading Disabled=@(isUploading || string.IsNullOrEmpty(_currentUserId)) />
+     @if(isUploading || uploadProgress > 0) { <RadzenProgressBar Value="@uploadProgress" Unit="%" Visible="@(isUploading || uploadProgress > 0)" Style="margin-top: 1rem;" /> }
+</RadzenCard>
 
 @* --- Uploaded Documents List --- *@
 <div class="bg-white dark:bg-gray-800 border border-subtle dark:border-gray-700 rounded-lg shadow-sm p-6">
     <h4 class="text-xl font-semibold text-primary dark:text-gray-100 mb-4 font-serif">My Documents</h4>
-    @if (_isLoadingDocuments)
-    {
-        <RadzenProgressBar Value="100" ShowValue="false" Mode="ProgressBarMode.Indeterminate" Style="margin-bottom: 20px" />
-        <p class="text-secondary dark:text-gray-400">Loading documents...</p>
-    }
-    else if (_userDocuments == null || !_userDocuments.Any())
-    {
-        <p class="text-secondary dark:text-gray-400">No documents have been uploaded for your account yet.</p>
-    }
-    else
-    {
-        <RadzenDataGrid Data="@_userDocuments" TItem="CustomerDocument" AllowSorting="true" AllowPaging="true" PageSize="10"
-                        PagerHorizontalAlign="HorizontalAlign.Left" ShowPagingSummary="true" PagerAlwaysVisible="true" PageSizeOptions="new int[] { 5, 10, 20 }"
-                        Density="Density.Compact" Style="width: 100%;" EmptyText="No documents found." IsLoading="@_isLoadingDocuments">
+    @if (_isLoadingDocuments) { <RadzenProgressBar Value="100" ShowValue="false" Mode="ProgressBarMode.Indeterminate" Style="margin-bottom: 20px" /><p class="text-secondary...">Loading documents...</p> }
+    else if (_userDocuments == null || !_userDocuments.Any()) { <p class="text-secondary dark:text-gray-400">No documents found for this account.</p> }
+    else {
+        <RadzenDataGrid Data="@_userDocuments" TItem="CustomerDocument" AllowSorting="true" AllowPaging="true" PageSize="10" PagerHorizontalAlign="HorizontalAlign.Left" ShowPagingSummary="true" PagerAlwaysVisible="true" PageSizeOptions="new int[] { 5, 10, 20 }" Density="Density.Compact" Style="width: 100%;" EmptyText="No documents found." IsLoading="@_isLoadingDocuments">
             <Columns>
-                <RadzenDataGridColumn TItem="CustomerDocument" Property="OriginalFileName" Title="File Name" Width="250px" />
-                <RadzenDataGridColumn TItem="CustomerDocument" Property="Description" Title="Description" />
-                <RadzenDataGridColumn TItem="CustomerDocument" Property="UploadTimestamp" Title="Uploaded On" FormatString="{0:yyyy-MM-dd HH:mm}" Width="180px" TextAlign="TextAlign.Center" />
-                <RadzenDataGridColumn TItem="CustomerDocument" Title="Size" Property="FileSize" Sortable="true" Filterable="false" Width="120px" TextAlign="TextAlign.Right">
-                    <Template Context="doc">
-                        @FormatFileSize(doc.FileSize)
-                    </Template>
-                </RadzenDataGridColumn>
-                <RadzenDataGridColumn TItem="CustomerDocument" Title="Download" Sortable="false" Filterable="false" Width="100px" TextAlign="TextAlign.Center">
-                    <Template Context="doc">
-                        <RadzenLink Path="@($"/download/{doc.Id}")" Text="Download" Target="_blank" Icon="download" />
-                    </Template>
-                </RadzenDataGridColumn>
+                 <RadzenDataGridColumn TItem="CustomerDocument" Property="OriginalFileName" Title="File Name" Width="250px" />
+                 <RadzenDataGridColumn TItem="CustomerDocument" Property="Description" Title="Description" />
+                 <RadzenDataGridColumn TItem="CustomerDocument" Property="UploadTimestamp" Title="Uploaded On" FormatString="{0:yyyy-MM-dd HH:mm}" Width="180px" TextAlign="TextAlign.Center" />
+                 <RadzenDataGridColumn TItem="CustomerDocument" Title="Size" Property="FileSize" Sortable="true" Filterable="false" Width="120px" TextAlign="TextAlign.Right"><Template Context="doc">@FormatFileSize(doc.FileSize)</Template></RadzenDataGridColumn>
+                 <RadzenDataGridColumn TItem="CustomerDocument" Title="Download" Sortable="false" Filterable="false" Width="100px" TextAlign="TextAlign.Center"><Template Context="doc"><RadzenLink Path="@($"/download/{doc.Id}")" Text="Download" Target="_blank" Icon="download" /></Template></RadzenDataGridColumn>
             </Columns>
         </RadzenDataGrid>
     }
@@ -88,98 +81,47 @@
 @code {
     // --- Component State ---
     private bool _isLoadingDocuments = true;
-    private bool _isInDemoMode = false; // Flag to indicate demo mode
-
-    // --- Data ---
+    private bool _isInDemoMode = false;
     private List<CustomerDocument> _userDocuments = new();
-    private string? _currentUserId; // Determined in OnInitialized
+    private string? _currentUserId;
+    private RadzenUpload? uploadComponent;
+    private bool isUploading = false;
+    private int uploadProgress = 0;
+    private readonly HashSet<string> _allowedExtensions = new(StringComparer.OrdinalIgnoreCase) { ".pdf", ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx", ".txt", ".csv", ".jpg", ".jpeg", ".png", ".gif", ".bmp", ".tif", ".tiff", ".webp" };
+    private string _allowedExtensionsString => string.Join(",", _allowedExtensions);
 
-    // --- REMOVED OLD UPLOAD VARIABLES ---
+    // --- Lifecycle Method (Handles Demo Mode User ID) ---
+    protected override async Task OnInitializedAsync() { _isLoadingDocuments = true; _isInDemoMode = false; await InvokeAsync(StateHasChanged); var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync(); var user = authState.User; if (user.Identity?.IsAuthenticated ?? false) { _currentUserId = user.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value; Logger.LogInformation("Portal Docs: User authenticated. ID: {UserId}", _currentUserId); } else { _currentUserId = "683a96be-9b4a-4af7-a863-b98a88815cae"; _isInDemoMode = true; Logger.LogWarning("Portal Docs: User not authenticated. DEMO MODE using ID: {UserId}", _currentUserId); } if (string.IsNullOrEmpty(_currentUserId)) { Logger.LogError("Portal Docs: Could not determine User ID."); _isLoadingDocuments = false; await InvokeAsync(StateHasChanged); NotificationService.Notify(NotificationSeverity.Error, "Error", "Could not identify user account."); return; } await LoadUserDocuments(); _isLoadingDocuments = false; await InvokeAsync(StateHasChanged); }
 
-    // --- Lifecycle Method ---
-    protected override async Task OnInitializedAsync()
+    // --- Data Loading Method ---
+    private async Task LoadUserDocuments() { if (string.IsNullOrEmpty(_currentUserId)) { Logger.LogWarning("Portal LoadUserDocuments called without user ID."); _userDocuments = new List<CustomerDocument>(); return; } _isLoadingDocuments = true; await InvokeAsync(StateHasChanged); try { _userDocuments = await DbContext.CustomerDocuments.Where(d => d.TargetUserId == _currentUserId && !d.IsDeleted).OrderByDescending(d => d.UploadTimestamp).AsNoTracking().ToListAsync(); Logger.LogInformation("Portal loaded {Count} docs for user {UserId}", _userDocuments.Count, _currentUserId); } catch (Exception ex) { Logger.LogError(ex, "Portal error retrieving docs for user {UserId}", _currentUserId); _userDocuments = new List<CustomerDocument>(); NotificationService.Notify(NotificationSeverity.Error, "Load Error", "Could not retrieve documents."); } finally { _isLoadingDocuments = false; } }
+
+    // --- RadzenUpload Event Handlers ---
+    void TriggerUpload() { if (uploadComponent == null) { NotificationService.Notify(NotificationSeverity.Error, "Error", "Upload component error."); return; } Logger.LogInformation("Portal triggering customer upload to /api/upload/customer"); isUploading = true; uploadProgress = 0; InvokeAsync(StateHasChanged); uploadComponent.Upload(); }
+    void OnUploadProgress(UploadProgressArgs args) { uploadProgress = args.Progress; if (args.Progress == 100) { Logger.LogInformation("Portal upload transfer complete for {FileCount} files.", args.Files.Count()); } InvokeAsync(StateHasChanged); }
+    // --- CORRECTED OnUploadComplete ---
+    async Task OnUploadComplete(UploadCompleteEventArgs args)
     {
-        _isLoadingDocuments = true;
-        _isInDemoMode = false; // Reset flag
-        await InvokeAsync(StateHasChanged);
+        isUploading = false; uploadProgress = 0; string serverMessage = "Upload processed.";
+        bool serverSuccess = args.RawResponse.IsSuccessStatusCode; // Use property from HttpResponseMessage
 
-        // Load configuration needed for other parts maybe? Keep config injection if needed.
-        // _maxFileSize = Configuration.GetValue<long>("FileUploadSettings:MaxFileSizeMB", 20) * 1024 * 1024;
-        // _baseUploadDirectory = Configuration["FileUploadSettings:BasePath"] ?? Path.Combine("wwwroot", "user_uploads");
-        // if (string.IsNullOrWhiteSpace(Configuration["FileUploadSettings:BasePath"])) { Logger.LogWarning("FileUploadSettings:BasePath not configured."); }
+        try { if (args.JsonResponse?.RootElement.TryGetProperty("message", out var msg) == true) serverMessage = msg.GetString() ?? serverMessage; } catch (Exception ex) { Logger.LogWarning(ex, "Could not parse JSON message from portal upload response."); }
 
-        // Get auth state
-        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
-        var user = authState.User;
-
-        if (user.Identity?.IsAuthenticated ?? false)
+        if (serverSuccess)
         {
-             _currentUserId = user.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
-             Logger.LogInformation("User authenticated. User ID: {UserId}", _currentUserId);
+             Logger.LogInformation("Portal upload successful. Status: {StatusCode}", args.RawResponse.StatusCode); // Log StatusCode enum
+             NotificationService.Notify(NotificationSeverity.Success, "Upload Complete", serverMessage);
+             await LoadUserDocuments();
         }
         else
         {
-             // --- DEMO MODE: HARDCODE USER ID ---
-             _currentUserId = "683a96be-9b4a-4af7-a863-b98a88815cae"; // User test4@test.com's ID
-             _isInDemoMode = true; // Set demo flag
-             Logger.LogWarning("User not authenticated. DEMO MODE: Using hardcoded User ID: {UserId}", _currentUserId);
+             Logger.LogError("Portal upload failed. Status: {StatusCode}, Response: {Response}", args.RawResponse.StatusCode, args.RawResponse);
+             NotificationService.Notify(NotificationSeverity.Error, "Upload Failed", serverMessage);
         }
-
-        if (string.IsNullOrEmpty(_currentUserId))
-        {
-            Logger.LogError("Could not determine User ID. Cannot load or upload documents.");
-            _isLoadingDocuments = false;
-            await InvokeAsync(StateHasChanged);
-            // Maybe redirect or show permanent error?
-             NotificationService.Notify(NotificationSeverity.Error, "Error", "Could not identify user account.");
-             // NavigationManager.NavigateTo("/Error?message=UserIdentificationFailed", forceLoad: true); // Example redirect
-            return;
-        }
-
-        await LoadUserDocuments(); // Load documents
-
-        _isLoadingDocuments = false;
-        await InvokeAsync(StateHasChanged); // Final UI update after loading
-    }
-
-    // --- Data Loading Method ---
-    private async Task LoadUserDocuments()
-    {
-        if (string.IsNullOrEmpty(_currentUserId)) { Logger.LogWarning("LoadUserDocuments called without a valid _currentUserId."); _userDocuments = new List<CustomerDocument>(); return; }
-        _isLoadingDocuments = true;
+        if (uploadComponent != null && serverSuccess) { /* uploadComponent.Clear(); */ }
         await InvokeAsync(StateHasChanged);
-        try
-        {
-            _userDocuments = await DbContext.CustomerDocuments
-                .Where(d => d.TargetUserId == _currentUserId && !d.IsDeleted)
-                .OrderByDescending(d => d.UploadTimestamp)
-                .AsNoTracking()
-                .ToListAsync();
-            Logger.LogInformation("Loaded {Count} documents for user {UserId}", _userDocuments.Count, _currentUserId);
-        }
-        catch (Exception ex)
-        {
-            Logger.LogError(ex, "Error retrieving documents for user {UserId}", _currentUserId);
-            _userDocuments = new List<CustomerDocument>(); // Ensure empty list on error
-            NotificationService.Notify(NotificationSeverity.Error, "Load Error", "Could not retrieve document list.");
-        }
-        finally { _isLoadingDocuments = false; } // Grid IsLoading handles UI
     }
-
-    // --- File Upload Component Event Handlers ---
-    private async Task HandleUploadCompletion(List<CustomerDocument> savedDocs)
-    {
-        Logger.LogInformation("Portal page received {Count} uploaded documents for user {UserId}.", savedDocs.Count, _currentUserId);
-        await LoadUserDocuments(); // Refresh the grid
-        // Notification already shown by component
-        await InvokeAsync(StateHasChanged); // Ensure grid refresh updates UI if needed
-    }
-
-    private void HandleUploadError(string errorMessage)
-    {
-        Logger.LogError("Portal page received upload error for user {UserId}: {Error}", _currentUserId, errorMessage);
-        // Notification already shown by component
-    }
+    void OnUploadError(UploadErrorEventArgs args) { Logger.LogError("Portal Upload Client Error: {Message}", args.Message); NotificationService.Notify(NotificationSeverity.Error, "Upload Error", $"Could not upload: {args.Message}"); isUploading = false; uploadProgress = 0; InvokeAsync(StateHasChanged); }
 
     // --- Helper Methods ---
     private string FormatFileSize(long bytes) { const long k=1024,m=k*k,g=m*k;if(bytes<0)return "?";if(bytes==0)return "0 B";if(bytes<k)return $"{bytes} B";if(bytes<m)return $"{(double)bytes/k:F1} KB";if(bytes<g)return $"{(double)bytes/m:F1} MB";return $"{(double)bytes/g:F1} GB"; }
