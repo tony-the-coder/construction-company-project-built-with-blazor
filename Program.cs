@@ -12,30 +12,30 @@ using LehmanCustomConstruction.Data.Repositories;
 using LehmanCustomConstruction.Data.Common; // Namespace for EmailSettings AND CustomerDocument
 using LehmanCustomConstruction.Services.Interfaces; // Namespace for IEmailService
 using LehmanCustomConstruction.Services; // Namespace for EmailService
-// using LehmanCustomConstruction.Services; // Add when IntuitService is needed
 using Radzen;
-using System.Security.Claims; // Added for ClaimTypes
-using Microsoft.Extensions.Configuration; // Added for IConfiguration access in endpoint
-using Microsoft.Extensions.Logging; // Added for ILogger access in endpoint
-using System.IO; // Added for Path operations
-// using Microsoft.AspNetCore.Components.Web; // No longer strictly needed here
+using System.Security.Claims;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
+using System.IO;
+// REMOVE using statement for DemoAuthStateProvider if you added one
 
 var builder = WebApplication.CreateBuilder(args);
 
 // --- START: Service Registration ---
 
 builder.Services.AddRazorComponents()
-    // <<< FIX: Enable DetailedErrors for Blazor Server circuits >>>
     .AddInteractiveServerComponents(options =>
     {
-        options.DetailedErrors = true; // <<< ADD THIS LINE
+        options.DetailedErrors = true;
     });
 
 // --- Core Blazor & Identity Services ---
 builder.Services.AddCascadingAuthenticationState();
 builder.Services.AddScoped<IdentityUserAccessor>();
 builder.Services.AddScoped<IdentityRedirectManager>();
+// --- Restore Standard AuthenticationStateProvider ---
 builder.Services.AddScoped<AuthenticationStateProvider, IdentityRevalidatingAuthenticationStateProvider>();
+// --- END Restore ---
 
 // --- Antiforgery Service ---
 builder.Services.AddAntiforgery();
@@ -91,11 +91,10 @@ var app = builder.Build();
 // ======================================================================
 // --- START: Middleware Pipeline Configuration ---
 
-// Detailed Errors are also often enabled by default in Development environment
 if (app.Environment.IsDevelopment())
 {
     app.UseMigrationsEndPoint();
-    app.UseDeveloperExceptionPage(); // Shows detailed error page for non-Blazor requests
+    app.UseDeveloperExceptionPage();
 }
 else
 {
@@ -104,50 +103,59 @@ else
 }
 
 app.UseHttpsRedirection();
-
 app.UseStaticFiles();
-
 app.UseRouting();
 
-// Authentication & Authorization MUST come before Antiforgery and Endpoints
+// Keep Auth middleware, but endpoints/pages won't require it
 app.UseAuthentication();
 app.UseAuthorization();
 
-// Antiforgery SHOULD come after Auth but before Endpoint execution
 app.UseAntiforgery();
 
 // --- Endpoint Mapping ---
 app.MapRazorComponents<App>()
-    .AddInteractiveServerRenderMode(); // Keep this simple as before
+    .AddInteractiveServerRenderMode();
 
-// --- Map Identity Endpoints ---
-// Ensure this is active to handle the POST from Login.razor and others
 app.MapAdditionalIdentityEndpoints();
 
 // --- File Download Minimal API Endpoint ---
+// WARNING: Authentication/Authorization DISABLED for DEMO
 app.MapGet("/download/{id:int}", async (
     int id,
-    HttpContext httpContext,
+    // HttpContext httpContext, // Don't need HttpContext if not checking user
     ApplicationDbContext dbContext,
     IConfiguration configuration,
     ILogger<Program> logger) =>
 {
-    // ... (Your existing download logic remains unchanged) ...
-    if (!(httpContext.User.Identity?.IsAuthenticated ?? false)) { /*...*/ return Results.Unauthorized(); }
-    var userId = httpContext.User.FindFirstValue(ClaimTypes.NameIdentifier);
-    if (userId == null) { /*...*/ return Results.Forbid(); }
-    var document = await dbContext.CustomerDocuments.FindAsync(id);
-    if (document == null) { /*...*/ return Results.NotFound($"Document with ID {id} not found."); }
-    if (document.UploadedById != userId && document.TargetUserId != userId /*&& !httpContext.User.IsInRole("Admin")*/ ) { /*...*/ return Results.Forbid(); }
+    // --- REMOVED ALL AUTH CHECKS ---
+    logger.LogWarning("DEMO MODE: Download endpoint accessed anonymously for document ID {DocumentId}. RE-ENABLE AUTH!", id);
+
+    var document = await dbContext.CustomerDocuments.FirstOrDefaultAsync(d => d.Id == id && !d.IsDeleted); // Still check IsDeleted
+    if (document == null) { return Results.NotFound($"Document with ID {id} not found or marked as deleted."); }
+
+    // --- SECURITY RISK: No check on who can download what ---
+
     var basePath = configuration["FileUploadSettings:BasePath"];
-    if (string.IsNullOrWhiteSpace(basePath)) { /*...*/ return Results.Problem("Server configuration error: Upload path not set."); }
-    var filePath = Path.Combine(basePath, document.UploadedById, document.StoredFileName);
-    if (document.StoredFileName.Contains("..") || document.StoredFileName.IndexOfAny(Path.GetInvalidFileNameChars()) != -1) { /*...*/ return Results.BadRequest("Invalid filename."); }
-    if (!File.Exists(filePath)) { /*...*/ return Results.NotFound($"File associated with document ID {id} not found on server."); }
-    logger.LogInformation("Serving file for Document ID {DocumentId} to user {UserId}. Path: {FilePath}", id, userId, filePath);
+    if (string.IsNullOrWhiteSpace(basePath)) { logger.LogError("FileUploadSettings:BasePath not configured."); return Results.Problem("Server configuration error: Upload path not set."); }
+
+    // --- SECURITY: Use TARGET user ID for directory structure ---
+    string userDirectory = Path.Combine(basePath, document.TargetUserId ?? "_unknown_user");
+    string filePath = Path.Combine(userDirectory, document.StoredFileName);
+    // --- END SECURITY ---
+
+    // --- Path Traversal / Invalid Char Checks (Keep These) ---
+    var fullBasePath = Path.GetFullPath(basePath);
+    var fullFilePath = Path.GetFullPath(filePath);
+    if (!fullFilePath.StartsWith(fullBasePath, StringComparison.OrdinalIgnoreCase)) { logger.LogError("Potential Path Traversal Attack: Document {DocumentId}, Path {FilePath}", id, filePath); return Results.BadRequest("Invalid file path."); }
+    if (document.StoredFileName.Contains("..") || document.StoredFileName.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0) { logger.LogError("Invalid StoredFileName detected: Document {DocumentId}, FileName {FileName}", id, document.StoredFileName); return Results.BadRequest("Invalid stored filename."); }
+    // --- End Checks ---
+
+    if (!File.Exists(filePath)) { logger.LogWarning("File not found on server for Document ID {DocumentId}, Path: {FilePath}", id, filePath); return Results.NotFound($"File associated with document ID {id} not found on server."); }
+
+    logger.LogInformation("DEMO MODE: Serving file for Document ID {DocumentId}. Path: {FilePath}", id, filePath);
     return Results.File(filePath, document.ContentType ?? "application/octet-stream", document.OriginalFileName);
 
-}).RequireAuthorization();
+}); // <<< REMOVED .RequireAuthorization() <<<
 // --- End File Download Endpoint ---
 
 // --- END: Middleware Pipeline Configuration ---
