@@ -1,6 +1,5 @@
 ﻿@* File: Components/Shared/FileUploadComponent.razor *@
 
-@* Inject services needed WITHIN the component *@
 @inject ILogger<FileUploadComponent> Logger
 @inject IConfiguration Configuration
 @inject ApplicationDbContext DbContext
@@ -51,7 +50,7 @@
             }
             else
             {
-                <p class="mt-1 text-xs text-secondary dark:text-gray-400">Max size: @(_maxFileSize / (1024 * 1024)) MB. Allowed: @string.Join(", ", _allowedExtensions.Select(ext => ext.ToUpperInvariant()))</p>
+                <p class="mt-1 text-xs text-secondary dark:text-gray-400">Max size: @(_maxFileSize / (1024 * 1024)) MB. Max files: @MaxNumberOfFiles. Allowed: @string.Join(", ", _allowedExtensions.Select(ext => ext.ToUpperInvariant()))</p>
             }
         </div>
 
@@ -90,6 +89,7 @@
     [Parameter] public bool AllowMultipleFiles { get; set; } = false;
     [Parameter] public string CssClass { get; set; } = "";
     [Parameter] public bool IsInDemoMode { get; set; } = false;
+    [Parameter] public int MaxNumberOfFiles { get; set; } = 15; // Default limit
 
     // --- Event Callbacks ---
     [Parameter] public EventCallback<List<CustomerDocument>> OnUploadComplete { get; set; }
@@ -114,7 +114,7 @@
         [Required(ErrorMessage = "Please select at least one file.")]
         [MinLength(1, ErrorMessage = "Please select at least one file.")]
         public List<IBrowserFile> FilesToUpload { get; set; } = new();
-        public IBrowserFile? FileToUpload { get; set; } // Only used if AllowMultipleFiles is false
+        public IBrowserFile? FileToUpload { get; set; }
         [StringLength(500)] public string? Description { get; set; }
         public bool HasFiles(bool allowMultiple) => allowMultiple ? FilesToUpload.Any() : FileToUpload != null;
     }
@@ -124,32 +124,95 @@
     {
         _maxFileSize = Configuration.GetValue<long>("FileUploadSettings:MaxFileSizeMB", 20) * 1024 * 1024;
         _baseUploadDirectory = Configuration["FileUploadSettings:BasePath"] ?? "";
-        if (string.IsNullOrWhiteSpace(_baseUploadDirectory) || !Path.IsPathRooted(_baseUploadDirectory))
-        {
-            Logger.LogError("FileUploadSettings:BasePath '{Path}' is missing, empty, or not absolute. Uploads will fail.", _baseUploadDirectory);
-            _baseUploadDirectory = ""; // Prevent usage of invalid path
-        }
+        if (string.IsNullOrWhiteSpace(_baseUploadDirectory) || !Path.IsPathRooted(_baseUploadDirectory)) { Logger.LogError("BasePath '{Path}' invalid.", _baseUploadDirectory); _baseUploadDirectory = ""; }
         else { Logger.LogInformation("FileUploadComponent Initialized. Base Path: {Path}", _baseUploadDirectory); }
     }
 
+    // --- CORRECTED HandleFileSelected with Notification ---
     private async Task HandleFileSelected(InputFileChangeEventArgs e)
     {
-        _isFileLoading = true; _userFeedbackMessage = null; _uploadModel.FileToUpload = null; _uploadModel.FilesToUpload.Clear(); _feedbackSuccess = false;
+        _isFileLoading = true;
+        _userFeedbackMessage = null;
+        _uploadModel.FileToUpload = null; // Reset single file mode if used before
+        _uploadModel.FilesToUpload.Clear();
+        _feedbackSuccess = false;
         await InvokeAsync(StateHasChanged);
 
         List<IBrowserFile> selectedFiles = new();
-        if (AllowMultipleFiles) { selectedFiles.AddRange(e.GetMultipleFiles(100)); } else if (e.File != null) { selectedFiles.Add(e.File); }
-        if (!selectedFiles.Any()) { _userFeedbackMessage = "No file selected."; _feedbackSuccess = false; _isFileLoading = false; await InvokeAsync(StateHasChanged); return; }
-
         List<IBrowserFile> validFiles = new();
-        foreach (var file in selectedFiles) { if (ValidateFile(file)) { validFiles.Add(file); } else { NotificationService.Notify(NotificationSeverity.Warning, "Invalid File", $"{file.Name}: {_userFeedbackMessage}"); } }
 
-        if (AllowMultipleFiles) { _uploadModel.FilesToUpload = validFiles; }
-        else { _uploadModel.FileToUpload = validFiles.FirstOrDefault(); }
+        try
+        {
+            // Read up to MaxNumberOfFiles + 1 to detect if limit was exceeded
+            selectedFiles.AddRange(e.GetMultipleFiles(MaxNumberOfFiles + 1));
 
-        if (!validFiles.Any()) { _userFeedbackMessage = "No valid files selected."; _feedbackSuccess = false; } else { _userFeedbackMessage = null; }
+            // --- Check OUR file count limit FIRST ---
+            if (AllowMultipleFiles && selectedFiles.Count > MaxNumberOfFiles)
+            {
+                _userFeedbackMessage = $"Error: Cannot select more than {MaxNumberOfFiles} files at once. You selected {selectedFiles.Count}.";
+                _feedbackSuccess = false;
+                // <<< ADDED NOTIFICATION HERE >>>
+                NotificationService.Notify(NotificationSeverity.Error, "Too Many Files Selected", $"You can only upload a maximum of {MaxNumberOfFiles} files at a time.", 7000); // Show for 7 seconds
+                selectedFiles.Clear(); // Don't process any files
+            }
+            else if (!selectedFiles.Any()) // Check if any file was selected
+            {
+                _userFeedbackMessage = "No file selected.";
+                _feedbackSuccess = false;
+            }
+            // --- END file count limit check ---
 
-        _isFileLoading = false; await InvokeAsync(StateHasChanged);
+            // --- Process selected files IF any exist AND within limit ---
+            if (selectedFiles.Any())
+            {
+                foreach (var file in selectedFiles)
+                {
+                    // Validate individual files (size, extension)
+                    if (ValidateFile(file))
+                    {
+                        validFiles.Add(file);
+                    }
+                    else
+                    {
+                        // Notify about invalid individual file
+                        NotificationService.Notify(NotificationSeverity.Warning, "Invalid File", $"{file.Name}: {_userFeedbackMessage}", 5000);
+                    }
+                }
+
+                // Assign valid files to the model
+                if (AllowMultipleFiles) { _uploadModel.FilesToUpload = validFiles; }
+                else { _uploadModel.FileToUpload = validFiles.FirstOrDefault(); } // Assign first valid file if single mode
+
+                // Update feedback based on whether any valid files remain
+                if (!validFiles.Any() && selectedFiles.Any()) { _userFeedbackMessage = "No valid files selected after validation."; _feedbackSuccess = false; }
+                else if (validFiles.Any()) { _userFeedbackMessage = null; } // Clear error if at least one is valid
+            }
+            // --- END file processing ---
+        }
+        catch (InvalidOperationException ioEx) when (ioEx.Message.Contains("maximum number of files")) // Catch the specific InputFile limit exception
+        {
+            Logger.LogWarning(ioEx, "InputFile internal limit exceeded.");
+            _userFeedbackMessage = $"Error: Too many files selected. Please select {MaxNumberOfFiles} or fewer."; // Use our limit in the message
+            _feedbackSuccess = false;
+            // <<< ADDED NOTIFICATION HERE >>>
+            NotificationService.Notify(NotificationSeverity.Error, "Too Many Files", _userFeedbackMessage, 7000);
+            // Ensure lists are cleared
+            _uploadModel.FilesToUpload.Clear();
+            _uploadModel.FileToUpload = null;
+        }
+        catch (Exception ex) // Catch other potential errors
+        {
+            Logger.LogError(ex, "Error processing selected files.");
+            _userFeedbackMessage = $"Error selecting files: {ex.Message}";
+            _feedbackSuccess = false;
+            NotificationService.Notify(NotificationSeverity.Error, "Selection Error", "An unexpected error occurred while selecting files.", 7000);
+            _uploadModel.FilesToUpload.Clear();
+            _uploadModel.FileToUpload = null;
+        }
+        finally
+        {
+            _isFileLoading = false; await InvokeAsync(StateHasChanged);
+        }
     }
 
     private async Task HandleFileUpload()
@@ -157,114 +220,34 @@
         if (!_uploadModel.HasFiles(AllowMultipleFiles)) { /*...*/ return; }
         if (_isFileLoading || _isUploading) return;
         if (string.IsNullOrEmpty(TargetUserId) || string.IsNullOrEmpty(UploaderUserId)) { /*...*/ return; }
-        if (string.IsNullOrEmpty(_baseUploadDirectory)) { _userFeedbackMessage = "Upload config error."; _feedbackSuccess = false; NotificationService.Notify(NotificationSeverity.Error, "Config Error", "Base upload path not set."); await OnUploadError.InvokeAsync(_userFeedbackMessage); return; }
+        if (string.IsNullOrEmpty(_baseUploadDirectory)) { /*...*/ await OnUploadError.InvokeAsync("Upload config error."); return; }
 
         _isUploading = true; _userFeedbackMessage = null;
         await InvokeAsync(StateHasChanged);
 
         List<IBrowserFile> filesToProcess = AllowMultipleFiles ? _uploadModel.FilesToUpload : new List<IBrowserFile> { _uploadModel.FileToUpload! };
-        List<CustomerDocument> savedDocs = new();
-        bool anyError = false;
-        string? collectiveDescription = AllowDescription ? _uploadModel.Description?.Trim() : null;
+        List<CustomerDocument> savedDocs = new(); bool anyError = false; string? collectiveDescription = AllowDescription ? _uploadModel.Description?.Trim() : null;
 
         foreach (var file in filesToProcess)
         {
-            // --- Use a variable to store file size early ---
-            long currentFileSize = 0;
-            try { currentFileSize = file.Size; } // Access Size property safely
-            catch (Exception ex) { Logger.LogError(ex, "Error accessing file size for {FileName}", file.Name); anyError = true; NotificationService.Notify(NotificationSeverity.Error, $"File Error: {file.Name}", "Could not read file size."); continue; } // Skip this file if size cannot be read
-
-            // --- Re-validate with the size we just read ---
-            if (!ValidateFile(file, currentFileSize)) { anyError = true; continue; } // Skip if invalid
-
-            string userDirectory = Path.Combine(_baseUploadDirectory, TargetUserId);
-            string safeOriginalFileName = Path.GetFileName(file.Name);
-            string uniqueFileName = $"{Guid.NewGuid()}{Path.GetExtension(safeOriginalFileName)}";
-            string filePath = Path.Combine(userDirectory, uniqueFileName);
-            string? savedFilePath = null;
-
-            try
-            {
-                Directory.CreateDirectory(userDirectory);
-                var fullDirectoryPath = Path.GetFullPath(userDirectory);
-                var fullFilePath = Path.GetFullPath(filePath);
-                if (!fullFilePath.StartsWith(fullDirectoryPath, StringComparison.OrdinalIgnoreCase)) { throw new SecurityException($"Path error for {safeOriginalFileName}."); }
-
-                Logger.LogInformation("Saving '{Original}' (Size: {Size}) for {TargetUser} by {UploaderUser} to {Path}", safeOriginalFileName, currentFileSize, TargetUserId, UploaderUserId, filePath);
-                await using FileStream fs = new(filePath, FileMode.Create);
-                using var stream = file.OpenReadStream(_maxFileSize); // Use the configured max size limit here
-                await stream.CopyToAsync(fs);
-                savedFilePath = filePath;
-                Logger.LogInformation("Saved: {Path}", filePath);
-
-                // --- Create DB Record using the size read earlier ---
-                var document = new CustomerDocument
-                    {
-                        OriginalFileName = safeOriginalFileName,
-                        StoredFileName = uniqueFileName,
-                        ContentType = file.ContentType ?? "application/octet-stream",
-                        FileSize = currentFileSize, // <<< USE THE size READ EARLIER
-                        UploadTimestamp = DateTime.UtcNow,
-                        Description = collectiveDescription,
-                        UploadedById = UploaderUserId,
-                        TargetUserId = TargetUserId,
-                        IsDeleted = false
-                    };
-                DbContext.CustomerDocuments.Add(document);
-                await DbContext.SaveChangesAsync();
-                Logger.LogInformation("DB record created ID: {DocId}", document.Id);
-                savedDocs.Add(document);
-            }
-            catch (Exception ex) // Catch all exceptions for this file iteration
-            {
-                anyError = true;
-                Logger.LogError(ex, "Error uploading file '{Original}' for target {TargetUser}", safeOriginalFileName, TargetUserId);
-                _userFeedbackMessage = $"Error uploading {safeOriginalFileName}: {ex.Message}";
-                NotificationService.Notify(NotificationSeverity.Error, $"Upload Error: {safeOriginalFileName}", ex.Message);
-                TryDeleteFile(savedFilePath);
-            }
+            long currentFileSize = 0; try { currentFileSize = file.Size; } catch (Exception ex) { Logger.LogError(ex, "Size error for {FileName}", file.Name); anyError = true; NotificationService.Notify(NotificationSeverity.Error, $"File Error: {file.Name}", "Could not read size."); continue; }
+            if (!ValidateFile(file, currentFileSize)) { anyError = true; continue; }
+            string userDirectory = Path.Combine(_baseUploadDirectory, TargetUserId); string safeOriginalFileName = Path.GetFileName(file.Name); string uniqueFileName = $"{Guid.NewGuid()}{Path.GetExtension(safeOriginalFileName)}"; string filePath = Path.Combine(userDirectory, uniqueFileName); string? savedFilePath = null;
+            try { Directory.CreateDirectory(userDirectory); var fullDirectoryPath = Path.GetFullPath(userDirectory); var fullFilePath = Path.GetFullPath(filePath); if (!fullFilePath.StartsWith(fullDirectoryPath, StringComparison.OrdinalIgnoreCase)) { throw new SecurityException($"Path error for {safeOriginalFileName}."); } Logger.LogInformation("Saving '{Original}' ({Size})...", safeOriginalFileName, currentFileSize); await using FileStream fs = new(filePath, FileMode.Create); using var stream = file.OpenReadStream(_maxFileSize); await stream.CopyToAsync(fs); savedFilePath = filePath; Logger.LogInformation("Saved: {Path}", filePath); var document = new CustomerDocument { OriginalFileName = safeOriginalFileName, StoredFileName = uniqueFileName, ContentType = file.ContentType ?? "application/octet-stream", FileSize = currentFileSize, UploadTimestamp = DateTime.UtcNow, Description = collectiveDescription, UploadedById = UploaderUserId, TargetUserId = TargetUserId, IsDeleted = false }; DbContext.CustomerDocuments.Add(document); await DbContext.SaveChangesAsync(); Logger.LogInformation("DB record created ID: {DocId}", document.Id); savedDocs.Add(document); }
+            catch (Exception ex) { anyError = true; Logger.LogError(ex, "Error uploading file '{Original}'", safeOriginalFileName); _userFeedbackMessage = $"Error uploading {safeOriginalFileName}: {ex.Message}"; NotificationService.Notify(NotificationSeverity.Error, $"Upload Error: {safeOriginalFileName}", ex.Message); TryDeleteFile(savedFilePath); }
         } // End foreach
 
-        _isUploading = false;
-        var descBeforeReset = _uploadModel.Description;
-        _uploadModel = new(); // Reset form model
-        _uploadModel.Description = descBeforeReset; // Restore description after reset
-
-        // --- Final Feedback & Event Callbacks ---
+        _isUploading = false; var descBeforeReset = _uploadModel.Description; _uploadModel = new(); _uploadModel.Description = descBeforeReset;
         if (savedDocs.Any() && !anyError) { _userFeedbackMessage = $"{savedDocs.Count} file(s) uploaded successfully."; _feedbackSuccess = true; NotificationService.Notify(NotificationSeverity.Success, "Upload Complete", _userFeedbackMessage); await OnUploadComplete.InvokeAsync(savedDocs); }
         else if (savedDocs.Any() && anyError) { _userFeedbackMessage = $"Partial success: {savedDocs.Count} uploaded, but some failed."; _feedbackSuccess = false; NotificationService.Notify(NotificationSeverity.Warning, "Partial Upload", _userFeedbackMessage); await OnUploadComplete.InvokeAsync(savedDocs); }
         else if (anyError) { await OnUploadError.InvokeAsync(_userFeedbackMessage ?? "An unknown upload error occurred."); }
         else { _userFeedbackMessage ??= "No valid files were selected to upload."; _feedbackSuccess = false; }
-
         await InvokeAsync(StateHasChanged);
     }
 
-    // --- Modified ValidateFile to accept size explicitly ---
-    private bool ValidateFile(IBrowserFile file, long fileSize)
-    {
-        if (file == null) { _userFeedbackMessage = "No file selected."; _feedbackSuccess = false; return false; }
-        if (fileSize == 0) { _userFeedbackMessage = $"Cannot upload empty file: {file.Name}."; _feedbackSuccess = false; return false; }
-        if (fileSize > _maxFileSize) { _userFeedbackMessage = $"File {file.Name} exceeds size limit ({FormatFileSize(_maxFileSize)})."; _feedbackSuccess = false; return false; }
-        var fileExtension = Path.GetExtension(file.Name);
-        if (string.IsNullOrEmpty(fileExtension) || !_allowedExtensions.Contains(fileExtension)) { _userFeedbackMessage = $"Invalid file type: {file.Name}. Allowed: {string.Join(", ", _allowedExtensions.Select(ext => ext.ToUpperInvariant()))}"; _feedbackSuccess = false; return false; }
-        _userFeedbackMessage = null; return true;
-    }
 
-    // Overload for HandleFileSelected which doesn't have the size readily available
-    private bool ValidateFile(IBrowserFile file)
-    {
-        long size = 0;
-        try { size = file.Size; } catch (Exception ex) { Logger.LogWarning(ex, "Could not access initial size for {FileName} during selection validation.", file?.Name ?? "unknown file"); /* Ignore size check here, rely on submit validation */ }
-        // Perform checks other than size if size access failed
-        if (file == null) { _userFeedbackMessage = "No file selected."; _feedbackSuccess = false; return false; }
-        var fileExtension = Path.GetExtension(file.Name);
-        if (string.IsNullOrEmpty(fileExtension) || !_allowedExtensions.Contains(fileExtension)) { _userFeedbackMessage = $"Invalid file type: {file.Name}. Allowed: {string.Join(", ", _allowedExtensions.Select(ext => ext.ToUpperInvariant()))}"; _feedbackSuccess = false; return false; }
-        // Re-check size if it was accessible
-        if (size > 0 && size > _maxFileSize) { _userFeedbackMessage = $"File {file.Name} exceeds size limit ({FormatFileSize(_maxFileSize)})."; _feedbackSuccess = false; return false; }
-
-        _userFeedbackMessage = null; return true; // Assume valid if extension is okay and size wasn't checked or was okay
-    }
-
+    private bool ValidateFile(IBrowserFile file, long fileSize) { if (file == null) { _userFeedbackMessage = "No file selected."; _feedbackSuccess = false; return false; } if (fileSize == 0) { _userFeedbackMessage = $"Cannot upload empty file: {file.Name}."; _feedbackSuccess = false; return false; } if (fileSize > _maxFileSize) { _userFeedbackMessage = $"File {file.Name} exceeds size limit ({FormatFileSize(_maxFileSize)})."; _feedbackSuccess = false; return false; } var fileExtension = Path.GetExtension(file.Name); if (string.IsNullOrEmpty(fileExtension) || !_allowedExtensions.Contains(fileExtension)) { _userFeedbackMessage = $"Invalid file type: {file.Name}. Allowed: {string.Join(", ", _allowedExtensions.Select(ext => ext.ToUpperInvariant()))}"; _feedbackSuccess = false; return false; } _userFeedbackMessage = null; return true; }
+    private bool ValidateFile(IBrowserFile file) { long size = 0; try { size = file.Size; } catch { } if (file == null) { _userFeedbackMessage = "No file selected."; _feedbackSuccess = false; return false; } var fileExtension = Path.GetExtension(file.Name); if (string.IsNullOrEmpty(fileExtension) || !_allowedExtensions.Contains(fileExtension)) { _userFeedbackMessage = $"Invalid file type: {file.Name}. Allowed: {string.Join(", ", _allowedExtensions.Select(ext => ext.ToUpperInvariant()))}"; _feedbackSuccess = false; return false; } if (size > 0 && size > _maxFileSize) { _userFeedbackMessage = $"File {file.Name} exceeds size limit ({FormatFileSize(_maxFileSize)})."; _feedbackSuccess = false; return false; } _userFeedbackMessage = null; return true; }
     private void TryDeleteFile(string? filePath) { if (filePath != null && File.Exists(filePath)) { try { File.Delete(filePath); Logger.LogWarning("Cleaned up file '{FilePath}' due to upload error.", filePath); } catch (Exception delEx) { Logger.LogError(delEx, "Failed to clean up file '{FilePath}' after upload error.", filePath); } } }
     private string FormatFileSize(long bytes) { const long k = 1024, m = k * k, g = m * k; if (bytes < 0) return "?"; if (bytes == 0) return "0 B"; if (bytes < k) return $"{bytes} B"; if (bytes < m) return $"{(double)bytes / k:F1} KB"; if (bytes < g) return $"{(double)bytes / m:F1} MB"; return $"{(double)bytes / g:F1} GB"; }
 }
