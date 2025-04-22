@@ -9,15 +9,14 @@
     <link rel="stylesheet" href="styles/output.css" />
     <link rel="stylesheet" href="LehmanCustomConstruction.styles.css" />
     <link rel="icon" type="image/png" href="favicon.png" />
-    <HeadOutlet @rendermode="InteractiveServer" />
+    <HeadOutlet />
 </head>
 
 <body>
 
-    <CascadingAuthenticationState>
-        @* <<< Ensure this is active <<< *@
-        <Routes @rendermode="new InteractiveServerRenderMode(prerender: false)" />
-    </CascadingAuthenticationState>
+
+        <Routes />
+    
 
 <script src="https://cdn.jsdelivr.net/npm/flowbite@3.1.2/dist/flowbite.min.js"></script>  
     <script src="_framework/blazor.web.js"></script> 

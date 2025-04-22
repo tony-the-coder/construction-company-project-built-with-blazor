@@ -1,10 +1,6 @@
-﻿@* File: Components/Account/Shared/StatusMessage.razor *@
-@using Microsoft.AspNetCore.Http 
-@using Microsoft.AspNetCore.Identity
-
-@if (!string.IsNullOrEmpty(DisplayMessage))
+﻿@if (!string.IsNullOrEmpty(DisplayMessage))
 {
-    var statusMessageClass = DisplayMessage.StartsWith("Error", StringComparison.OrdinalIgnoreCase) ? "danger" : "success";
+    var statusMessageClass = DisplayMessage.StartsWith("Error") ? "danger" : "success";
     <div class="alert alert-@statusMessageClass" role="alert">
         @DisplayMessage
     </div>
@@ -16,38 +12,18 @@
     [Parameter]
     public string? Message { get; set; }
 
-    // Allow HttpContext to be null as it's not always available in interactive Blazor Server
     [CascadingParameter]
-    private HttpContext? HttpContext { get; set; }
+    private HttpContext HttpContext { get; set; } = default!;
 
     private string? DisplayMessage => Message ?? messageFromCookie;
 
     protected override void OnInitialized()
     {
-        // Only attempt to access HttpContext if it's not null (available during initial render)
-        if (HttpContext is not null)
+        messageFromCookie = HttpContext.Request.Cookies[IdentityRedirectManager.StatusCookieName];
+
+        if (messageFromCookie is not null)
         {
-            // TryGetValue is safer than direct access
-            if (HttpContext.Request.Cookies.TryGetValue(IdentityRedirectManager.StatusCookieName, out messageFromCookie))
-            {
-                // Check if Response is available and hasn't started before deleting cookie
-                // Deleting cookies should typically happen server-side during the POST redirect flow
-                // but this code handles it if needed here.
-                if (HttpContext.Response?.HasStarted == false)
-                {
-                    HttpContext.Response.Cookies.Delete(IdentityRedirectManager.StatusCookieName);
-                }
-                else
-                {
-                    // Log or handle the case where the response has already started
-                    Console.WriteLine("Warning: Response has already started in StatusMessage.OnInitialized. Cannot delete cookie.");
-                }
-            }
-        }
-        else
-        {
-            // Log or handle the case where HttpContext is null if necessary
-            Console.WriteLine("Info: HttpContext was null in StatusMessage.OnInitialized (expected in some interactive render scenarios).");
+            HttpContext.Response.Cookies.Delete(IdentityRedirectManager.StatusCookieName);
         }
     }
 }
