@@ -107,7 +107,7 @@ namespace LehmanCustomConstruction.Migrations
 
                     b.HasKey("ID");
 
-                    b.ToTable("BlogCategories");
+                    b.ToTable("BlogCategories", (string)null);
                 });
 
             modelBuilder.Entity("LehmanCustomConstruction.Data.Blogs.BlogPost", b =>
@@ -152,7 +152,7 @@ namespace LehmanCustomConstruction.Migrations
 
                     b.HasKey("ID");
 
-                    b.ToTable("BlogPosts");
+                    b.ToTable("BlogPosts", (string)null);
                 });
 
             modelBuilder.Entity("LehmanCustomConstruction.Data.Blogs.BlogPostCategory", b =>
@@ -167,7 +167,7 @@ namespace LehmanCustomConstruction.Migrations
 
                     b.HasIndex("BlogCategoryId");
 
-                    b.ToTable("BlogPostCategories");
+                    b.ToTable("BlogPostCategories", (string)null);
                 });
 
             modelBuilder.Entity("LehmanCustomConstruction.Data.Common.ContactInquiry", b =>
@@ -214,7 +214,7 @@ namespace LehmanCustomConstruction.Migrations
 
                     b.HasKey("Id");
 
-                    b.ToTable("ContactInquiries");
+                    b.ToTable("ContactInquiries", (string)null);
                 });
 
             modelBuilder.Entity("LehmanCustomConstruction.Data.Common.CustomerDocument", b =>
@@ -264,7 +264,7 @@ namespace LehmanCustomConstruction.Migrations
 
                     b.HasIndex("UploadedById");
 
-                    b.ToTable("CustomerDocuments");
+                    b.ToTable("CustomerDocuments", (string)null);
                 });
 
             modelBuilder.Entity("LehmanCustomConstruction.Data.Common.PageContent", b =>
@@ -282,7 +282,7 @@ namespace LehmanCustomConstruction.Migrations
 
                     b.HasKey("PageKey");
 
-                    b.ToTable("PageContents");
+                    b.ToTable("PageContents", (string)null);
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRole", b =>

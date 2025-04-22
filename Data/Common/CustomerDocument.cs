@@ -1,10 +1,10 @@
-﻿using LehmanCustomConstruction.Data;
+﻿// File Path: LehmanCustomConstruction.Data/Common/CustomerDocument.cs
+using LehmanCustomConstruction.Data; // For ApplicationUser
 using System;
 using System.ComponentModel.DataAnnotations;
-using System.ComponentModel.DataAnnotations.Schema;
-// No need for using Microsoft.AspNetCore.Identity here as the ApplicationUser is in the same namespace level
+using System.ComponentModel.DataAnnotations.Schema; // Required for [ForeignKey], [InverseProperty]
 
-namespace LehmanCustomConstruction.Data.Common // Adjust namespace if your project structure differs
+namespace LehmanCustomConstruction.Data.Common // Or adjust if your structure differs
 {
     public class CustomerDocument
     {
@@ -15,8 +15,8 @@ namespace LehmanCustomConstruction.Data.Common // Adjust namespace if your proje
         [StringLength(260, ErrorMessage = "File name is too long.")]
         public string OriginalFileName { get; set; } = string.Empty;
 
-        [Required]
-        [StringLength(260)]
+        [Required(ErrorMessage = "Stored file name is required.")]
+        [StringLength(260)] // Assuming GUID + extension fits
         public string StoredFileName { get; set; } = string.Empty; // Unique name for storage
 
         [Required(ErrorMessage = "Content type is required.")]
@@ -31,28 +31,36 @@ namespace LehmanCustomConstruction.Data.Common // Adjust namespace if your proje
 
         // --- Foreign Key for the User who uploaded the file ---
         [Required]
-        public string UploadedById { get; set; } = string.Empty; // Foreign key property
+        public string UploadedById { get; set; } = string.Empty; // Foreign key property (matches ApplicationUser.Id)
 
         // --- Navigation property for the User who uploaded ---
-        // This name 'UploadedBy' matches the InverseProperty in ApplicationUser
+        [ForeignKey("UploadedById")]
+        [InverseProperty("DocumentsUploaded")] // <<< CORRECTED to match ApplicationUser.cs
         public virtual ApplicationUser? UploadedBy { get; set; }
 
         // --- Foreign Key for the User the document is intended for/associated with ---
-        // This could be the same as UploadedById or an Admin/Staff member depending on your logic
         [Required]
-        public string TargetUserId { get; set; } = string.Empty; // Foreign key property
+        public string TargetUserId { get; set; } = string.Empty; // Foreign key property (matches ApplicationUser.Id)
 
         // --- Navigation property for the Target User ---
-        // This name 'TargetUser' matches the InverseProperty in ApplicationUser
+        [ForeignKey("TargetUserId")]
+        [InverseProperty("DocumentsForUser")] // <<< CORRECTED to match ApplicationUser.cs
         public virtual ApplicationUser? TargetUser { get; set; }
 
         // Optional: Description field
         [StringLength(500, ErrorMessage = "Description cannot exceed 500 characters.")]
         public string? Description { get; set; }
 
-        // Optional: Link to a specific Project entity if you have one
-        // public int? ProjectId { get; set; }
-        // [ForeignKey("ProjectId")]
-        // public virtual Project? Project { get; set; }
+        // ************************************************
+        // --- PROPERTY FOR SOFT DELETE (ADDED BACK) ---
+        // ************************************************
+        [Required]
+        public bool IsDeleted { get; set; } = false; // Default to false (not deleted)
+
+        // ************************************************
+        // --- Optional: Timestamp for deletion ---
+        // ************************************************
+        // public DateTime? DeletedTimestamp { get; set; }
+
     }
 }

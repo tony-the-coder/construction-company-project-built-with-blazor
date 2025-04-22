@@ -1,0 +1,468 @@
+﻿<!-- Current issue is this page where the migration is missing
+
+@* File: Components/Pages/Portal/DocumentsPage.razor *@
+@page "/portal/documents"
+@layout PortalLayout
+@rendermode InteractiveServer
+@attribute [Authorize]
+
+@* Using Statements *@
+@using System.ComponentModel.DataAnnotations
+@using System.IO
+@using System.Security // For SecurityException
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+@using Microsoft.AspNetCore.Components.Forms
+@using Microsoft.EntityFrameworkCore
+@using Microsoft.Extensions.Configuration
+@using Microsoft.Extensions.Logging
+@using Radzen
+@using Radzen.Blazor
+@using LehmanCustomConstruction.Data // Assuming ApplicationDbContext is here
+@using LehmanCustomConstruction.Data.Common // Assuming CustomerDocument is here
+
+@* Service Injections *@
+@inject ILogger<DocumentsPage> Logger // Changed type param to DocumentsPage
+@inject IConfiguration Configuration
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject ApplicationDbContext DbContext
+@inject NavigationManager NavigationManager
+
+
+<PageTitle>My Documents | Lehman Custom Construction</PageTitle>
+
+<h3 class="text-2xl font-semibold text-primary dark:text-gray-100 mb-6 font-serif">Project Documents</h3>
+
+@* --- Upload Section --- *@
+<div class="bg-white dark:bg-gray-800 border border-subtle dark:border-gray-700 rounded-lg shadow-sm p-6 mb-8">
+    <h4 class="text-xl font-semibold text-primary dark:text-gray-100 mb-4 font-serif">Upload New Document</h4>
+
+@* Upload Result Message *@
+@if (!string.IsNullOrEmpty(_uploadResultMessage))
+{
+        <div class="@(_uploadSuccess ? "bg-green-100 border border-green-400 text-green-700 dark:bg-green-900/50 dark:border-green-600 dark:text-green-300" : "bg-red-100 border border-red-400 text-red-700 dark:bg-red-900/50 dark:border-red-600 dark:text-red-300") px-4 py-3 rounded relative mb-4" role="alert">
+            <span class="block sm:inline">@((MarkupString)_uploadResultMessage)</span> @* Use MarkupString if message contains HTML like links *@
+        </div>
+}
+
+@* Upload Form *@
+    <EditForm Model="_uploadModel" OnValidSubmit="HandleFileUpload">
+        <DataAnnotationsValidator />
+@* <ValidationSummary class="mb-4 text-red-600 dark:text-red-400" /> Consider removing if using ValidationMessage For each field *@
+
+@* File Input *@
+        <div class="mb-4">
+            <label for="documentFile" class="block text-sm font-medium text-primary dark:text-gray-300 mb-1">Select File</label>
+            <InputFile id="documentFile" OnChange="HandleFileSelected" class="block w-full text-sm text-gray-500 dark:text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-accent/10 dark:file:bg-accent/20 file:text-accent dark:file:text-accent/90 hover:file:bg-accent/20 dark:hover:file:bg-accent/30" accept="@string.Join(",", _allowedExtensions)" />
+            <ValidationMessage For="@(() => _uploadModel.FileToUpload)" class="text-red-600 dark:text-red-400 text-xs mt-1" />
+@if (_isFileLoading)
+{
+                <p class="text-sm text-blue-600 dark:text-blue-400 mt-1">Processing file selection...</p>
+}
+else if (_uploadModel.FileToUpload != null)
+{
+                  <p class="mt-1 text-xs text-secondary dark:text-gray-400">Selected: @_uploadModel.FileToUpload.Name (@FormatFileSize(_uploadModel.FileToUpload.Size))</p>
+}
+else
+{
+                 <p class="mt-1 text-xs text-secondary dark:text-gray-400">Max size: @(_maxFileSize / (1024*1024)) MB. Allowed: @string.Join(", ", _allowedExtensions)</p>
+}
+        </div>
+
+@* Description Input *@
+        <div class="mb-4">
+            <label for="description" class="block text-sm font-medium text-primary dark:text-gray-300 mb-1">Description (Optional)</label>
+            <InputText id="description" @bind-Value="_uploadModel.Description" class="block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:border-accent focus:ring-accent sm:text-sm bg-white dark:bg-gray-700 text-primary dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500" placeholder="E.g., Renovation Plans v1" />
+            <ValidationMessage For="@(() => _uploadModel.Description)" class="text-red-600 dark:text-red-400 text-xs mt-1" />
+        </div>
+
+@* Submit Button *@
+        <button type="submit" class="inline-flex items-center px-4 py-2 bg-primary border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-primary-dark focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-gray-800 focus:ring-primary disabled:opacity-50 disabled:cursor-not-allowed" disabled="@(_uploadModel.FileToUpload == null || _isFileLoading || _isUploading)">
+@if (_isUploading)
+{
+                 <svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"> <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle> <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path> </svg>
+                 <span>Uploading...</span>
+}
+else
+{
+                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5 -ml-1 mr-2"> <path fill-rule="evenodd" d="M10 3.75a.75.75 0 0 1 .75.75v6.19l1.72-1.72a.75.75 0 1 1 1.06 1.06l-3 3a.75.75 0 0 1-1.06 0l-3-3a.75.75 0 1 1 1.06-1.06l1.72 1.72V4.5a.75.75 0 0 1 .75-.75Z" clip-rule="evenodd" /> <path fill-rule="evenodd" d="M5.5 17a.5.5 0 0 1 .5-.5h8a.5.5 0 0 1 0 1H6a.5.5 0 0 1-.5-.5Z" clip-rule="evenodd" /> </svg>
+                 <span>Upload Document</span>
+}
+        </button>
+    </EditForm>
+</div>
+
+@* --- Uploaded Documents List --- *@
+<div class="bg-white dark:bg-gray-800 border border-subtle dark:border-gray-700 rounded-lg shadow-sm p-6">
+    <h4 class="text-xl font-semibold text-primary dark:text-gray-100 mb-4 font-serif">Uploaded Documents</h4>
+@if (_isLoadingDocuments) // Added loading indicator for the grid
+{
+        <p class="text-secondary dark:text-gray-400">Loading documents...</p>
+}
+else if (_userDocuments == null || !_userDocuments.Any())
+{
+        <p class="text-secondary dark:text-gray-400">No documents uploaded yet.</p>
+}
+else
+{
+        <RadzenDataGrid Data="@_userDocuments" TItem="CustomerDocument" AllowSorting="true" AllowPaging="true" PageSize="10"
+                        PagerHorizontalAlign="HorizontalAlign.Left" ShowPagingSummary="true" PagerAlwaysVisible="true" PageSizeOptions="new int[] { 5, 10, 20 }"
+                        Density="Density.Compact" Style="width: 100%;" EmptyText="No documents found." IsLoading="@_isLoadingDocuments">
+            <Columns>
+                <RadzenDataGridColumn TItem="CustomerDocument" Property="OriginalFileName" Title="File Name" Width="250px" />
+                <RadzenDataGridColumn TItem="CustomerDocument" Property="Description" Title="Description" />
+                <RadzenDataGridColumn TItem="CustomerDocument" Property="UploadTimestamp" Title="Uploaded On" FormatString="{0:yyyy-MM-dd HH:mm}" Width="180px" TextAlign="TextAlign.Center" />
+                <RadzenDataGridColumn TItem="CustomerDocument" Title="Size" Property="FileSize" Sortable="true" Filterable="false" Width="120px" TextAlign="TextAlign.Right">
+                    <Template Context="doc">
+                @FormatFileSize(doc.FileSize)
+                    </Template>
+                </RadzenDataGridColumn>
+
+        @* --- Download Column --- *@
+                <RadzenDataGridColumn TItem="CustomerDocument" Title="Download" Sortable="false" Filterable="false" Width="100px" TextAlign="TextAlign.Center">
+                    <Template Context="doc">
+                @* Link directly to the download endpoint, passing the document ID. Use forceLoad to make it a full browser request. *@
+                        <RadzenLink Path="@($"/download/{doc.Id}")" Text="Download" Target="_blank" Icon="download" />
+                @* Alternative simple link:
+                           <a href="@($"/download/{doc.Id}")" target="_blank" class="text-accent hover:text-accent-dark font-medium">Download</a>
+                        *@
+                    </Template>
+                </RadzenDataGridColumn>
+        @* --- End Download Column --- *@
+
+            </Columns>
+        </RadzenDataGrid>
+}
+</div>
+
+@code {
+    // Form Model
+    private UploadModel _uploadModel = new();
+
+    // Component State
+    private bool _isFileLoading = false; // For file selection processing
+    private bool _isUploading = false; // For upload submission processing
+    private string? _uploadResultMessage;
+    private bool _uploadSuccess;
+    private bool _isLoadingDocuments = true; // To show loading state for the grid
+
+    // Data
+    private List<CustomerDocument> _userDocuments = new();
+    private string? _currentUserId; // Store the logged-in user's ID
+
+    // Configuration Values
+    private string BaseUploadDirectory => Configuration["FileUploadSettings:BasePath"] ?? @"C:\LehmanConstructionUploads_Default"; // Default path if not configured
+    private readonly long _maxFileSize = 20 * 1024 * 1024; // 20 MB - TODO: Consider making configurable
+
+    // Allowed file extensions - using HashSet for efficient checks
+    private readonly HashSet<string> _allowedExtensions = new(StringComparer.OrdinalIgnoreCase)
+    {
+    ".xls", ".xlsx", ".doc", ".docx", ".ppt", ".pptx", ".jpg", ".jpeg", ".png", ".numbers", ".pages", ".key", ".pdf"
+    // Add others like ".heic", ".txt", ".csv" if needed
+    };
+
+    // ViewModel for the upload form
+    private class UploadModel
+    {
+    [Required(ErrorMessage = "Please select a file.")]
+    public IBrowserFile? FileToUpload { get; set; }
+
+    [StringLength(500, ErrorMessage = "Description cannot exceed 500 characters.")]
+    public string? Description { get; set; }
+    }
+
+    // --- Lifecycle Methods ---
+    protected override async Task OnInitializedAsync()
+    {
+    _isLoadingDocuments = true; // Start loading
+    await InvokeAsync(StateHasChanged); // Update UI
+
+    var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
+    var user = authState.User;
+
+    if (!(user.Identity?.IsAuthenticated ?? false))
+    {
+    Logger.LogWarning("User is not authenticated. Redirecting to login.");
+    // Redirect unauthenticated users immediately
+    NavigationManager.NavigateTo("/Account/Login", forceLoad: true); // Force load might be needed depending on auth setup
+    return;
+    }
+
+    _currentUserId = user.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+
+    if (string.IsNullOrEmpty(_currentUserId))
+    {
+    Logger.LogError("Authenticated user is missing NameIdentifier claim.");
+    _uploadResultMessage = "Error: Cannot identify user.";
+    _uploadSuccess = false;
+    _isLoadingDocuments = false;
+    await InvokeAsync(StateHasChanged);
+    return;
+    }
+
+    // Check base path configuration
+    var configuredPath = Configuration["FileUploadSettings:BasePath"];
+    if (string.IsNullOrWhiteSpace(configuredPath))
+    {
+    Logger.LogWarning("FileUploadSettings:BasePath is not configured. Using default: {DefaultPath}. Uploads may fail.", BaseUploadDirectory);
+    // Display a persistent warning?
+    }
+
+    await LoadUserDocuments(); // Load documents for the authenticated user
+
+    _isLoadingDocuments = false; // Finish loading
+    await InvokeAsync(StateHasChanged);
+    }
+
+    // --- Data Loading ---
+    private async Task LoadUserDocuments()
+    {
+    if (string.IsNullOrEmpty(_currentUserId)) return; // Don't load if user ID is missing
+
+    _isLoadingDocuments = true; // Indicate loading started for the grid
+    await InvokeAsync(StateHasChanged);
+
+    try
+    {
+    // Load documents where the current user is the TARGET recipient
+    _userDocuments = await DbContext.CustomerDocuments
+    .Where(d => d.TargetUserId == _currentUserId && !d.IsDeleted) // Show non-deleted documents for this user
+    .OrderByDescending(d => d.UploadTimestamp)
+    .AsNoTracking() // Optimize for read-only display
+    .ToListAsync();
+    Logger.LogInformation("Loaded {Count} documents for user {UserId}", _userDocuments.Count, _currentUserId);
+    }
+    catch (Exception ex)
+    {
+    Logger.LogError(ex, "Error retrieving documents for user {UserId} from database.", _currentUserId);
+    _userDocuments = new List<CustomerDocument>(); // Ensure list is not null
+    // Display error message to user?
+    // _uploadResultMessage = "Error loading existing documents list.";
+    // _uploadSuccess = false;
+    }
+    finally
+    {
+    _isLoadingDocuments = false; // Indicate loading finished for the grid
+    // No need for StateHasChanged here if the grid's IsLoading parameter handles UI updates
+    }
+    }
+
+    // --- File Input Handling ---
+    private async Task HandleFileSelected(InputFileChangeEventArgs e)
+    {
+    _isFileLoading = true;
+    _uploadResultMessage = null; // Clear previous messages
+    _uploadModel.FileToUpload = null; // Reset selection
+    _uploadSuccess = false;
+    await InvokeAsync(StateHasChanged); // Show loading
+
+    try
+    {
+    if (e.File != null)
+    {
+    // 1. Check Size
+    if (e.File.Size == 0)
+    {
+    _uploadResultMessage = "Cannot upload an empty file.";
+    _uploadSuccess = false;
+    }
+    else if (e.File.Size > _maxFileSize)
+    {
+    _uploadResultMessage = $"File size exceeds limit ({FormatFileSize(_maxFileSize)}).";
+    _uploadSuccess = false;
+    }
+    else
+    {
+    // 2. Check Extension
+    var fileExtension = Path.GetExtension(e.File.Name);
+    if (string.IsNullOrEmpty(fileExtension) || !_allowedExtensions.Contains(fileExtension))
+    {
+    _uploadResultMessage = $"Invalid file type. Allowed: {string.Join(", ", _allowedExtensions)}";
+    _uploadSuccess = false;
+    }
+    else
+    {
+    // File is valid
+    _uploadModel.FileToUpload = e.File;
+    _uploadResultMessage = null; // Clear error
+    }
+    }
+    }
+    else
+    {
+    _uploadResultMessage = "No file selected.";
+    _uploadSuccess = false;
+    }
+    }
+    catch (Exception ex)
+    {
+    Logger.LogError(ex, "Error during file selection process.");
+    _uploadResultMessage = $"Error selecting file: {ex.Message}";
+    _uploadSuccess = false;
+    }
+    finally
+    {
+    _isFileLoading = false;
+    await InvokeAsync(StateHasChanged); // Update UI
+    }
+    }
+
+    // --- File Upload Submission ---
+    private async Task HandleFileUpload()
+    {
+    if (_uploadModel.FileToUpload == null)
+    {
+    _uploadResultMessage = "Please select a valid file first.";
+    _uploadSuccess = false;
+    return;
+    }
+    if (_isFileLoading || _isUploading) return; // Prevent concurrent operations
+
+    _isUploading = true;
+    _uploadResultMessage = null; // Clear message
+    await InvokeAsync(StateHasChanged); // Show button loading state
+
+    // Ensure user ID is still valid (should be checked in OnInitialized, but double-check)
+    if (string.IsNullOrEmpty(_currentUserId))
+    {
+    _uploadResultMessage = "User identity lost. Please log in again.";
+    _uploadSuccess = false; _isUploading = false; await InvokeAsync(StateHasChanged); return;
+    }
+
+    // --- Re-validate file on submit (belt and suspenders) ---
+    if (!ValidateFile(_uploadModel.FileToUpload))
+    {
+    // Validation message already set by ValidateFile
+    _isUploading = false; _uploadModel.FileToUpload = null; await InvokeAsync(StateHasChanged); return;
+    }
+
+    // --- Prepare Paths and Security ---
+    string baseDir = BaseUploadDirectory;
+    string userDirectory = Path.Combine(baseDir, _currentUserId); // Subfolder per user
+    string safeOriginalFileName = Path.GetFileName(_uploadModel.FileToUpload.Name); // Sanitize
+    string uniqueFileName = $"{Guid.NewGuid()}{Path.GetExtension(safeOriginalFileName)}";
+    string filePath = Path.Combine(userDirectory, uniqueFileName);
+    string? savedFilePath = null; // Track if file was actually saved for cleanup
+
+    try
+    {
+    // Create directory if needed
+    Directory.CreateDirectory(userDirectory); // Throws on invalid chars
+
+    // --- Security: Final path check ---
+    var fullDirectoryPath = Path.GetFullPath(userDirectory);
+    var fullFilePath = Path.GetFullPath(filePath);
+    if (!fullFilePath.StartsWith(fullDirectoryPath, StringComparison.OrdinalIgnoreCase))
+    {
+    throw new SecurityException("Calculated file path is outside the allowed directory.");
+    }
+    // --- End Security Check ---
+
+    Logger.LogInformation("Attempting to save file for user {UserId} to {FilePath}", _currentUserId, filePath);
+
+    // --- Stream file to disk ---
+    await using FileStream fs = new(filePath, FileMode.Create);
+    using var stream = _uploadModel.FileToUpload.OpenReadStream(_maxFileSize);
+    await stream.CopyToAsync(fs);
+    savedFilePath = filePath; // Mark file as saved for potential cleanup on DB error
+    Logger.LogInformation("File saved successfully to {FilePath}", filePath);
+
+    // --- Create database record ---
+    var document = new CustomerDocument
+    {
+    OriginalFileName = safeOriginalFileName, StoredFileName = uniqueFileName,
+    ContentType = _uploadModel.FileToUpload.ContentType ?? "application/octet-stream",
+    FileSize = _uploadModel.FileToUpload.Size, UploadTimestamp = DateTime.UtcNow,
+    Description = _uploadModel.Description?.Trim(),
+    UploadedById = _currentUserId, // User uploading the file
+    TargetUserId = _currentUserId, // User the file is primarily for (themselves in this case)
+    IsDeleted = false
+    };
+
+    DbContext.CustomerDocuments.Add(document);
+    await DbContext.SaveChangesAsync();
+    Logger.LogInformation("Database record created for file {OriginalFile}, ID: {DocumentId}", safeOriginalFileName, document.Id);
+
+    // --- Success ---
+    await LoadUserDocuments(); // Refresh the document list
+    _uploadResultMessage = $"File '{safeOriginalFileName}' uploaded successfully.";
+    _uploadSuccess = true;
+    _uploadModel = new(); // Reset form model to clear file selection and description
+    }
+    catch (IOException ioEx) when (ioEx.Message.Contains("size")) // Handle stream size error specifically
+    {
+    Logger.LogWarning(ioEx, "File upload failed for user {UserId} due to size limit during stream.", _currentUserId);
+    _uploadResultMessage = $"Error uploading file: Exceeded size limit ({FormatFileSize(_maxFileSize)}).";
+    _uploadSuccess = false;
+    TryDeleteFile(savedFilePath); // Attempt cleanup
+    }
+    catch (UnauthorizedAccessException authEx)
+    {
+    Logger.LogError(authEx, "File system permission error for user {UserId} writing to {UserDirectory}", _currentUserId, userDirectory);
+    _uploadResultMessage = "Server error: Unable to save file (permission issue).";
+    _uploadSuccess = false;
+    }
+    catch (DbUpdateException dbEx)
+    {
+    Logger.LogError(dbEx, "Database error saving document record for user {UserId}. Inner: {Inner}", _currentUserId, dbEx.InnerException?.Message);
+    _uploadResultMessage = $"Server error: Could not save document information. ({dbEx.InnerException?.Message ?? dbEx.Message})";
+    _uploadSuccess = false;
+    TryDeleteFile(savedFilePath); // Attempt cleanup
+    }
+    catch (SecurityException secEx)
+    {
+    Logger.LogError(secEx, "Security error during file upload for user {UserId}.", _currentUserId);
+    _uploadResultMessage = $"Server security error: {secEx.Message}";
+    _uploadSuccess = false;
+    }
+    catch (Exception ex)
+    {
+    Logger.LogError(ex, "Unexpected error during file upload for user {UserId}", _currentUserId);
+    _uploadResultMessage = $"An unexpected error occurred: {ex.Message}";
+    _uploadSuccess = false;
+    TryDeleteFile(savedFilePath); // Attempt cleanup
+    }
+    finally
+    {
+    _isUploading = false; // Reset upload state
+    await InvokeAsync(StateHasChanged); // Update UI
+    }
+    }
+
+    // --- Helper Methods ---
+    private bool ValidateFile(IBrowserFile file)
+    {
+    if (file == null) return false; // Should be checked before calling
+
+    // Check Size
+    if (file.Size == 0) { _uploadResultMessage = "Cannot upload an empty file."; _uploadSuccess = false; return false; }
+    if (file.Size > _maxFileSize) { _uploadResultMessage = $"File size exceeds limit ({FormatFileSize(_maxFileSize)})."; _uploadSuccess = false; return false; }
+
+    // Check Extension
+    var fileExtension = Path.GetExtension(file.Name);
+    if (string.IsNullOrEmpty(fileExtension) || !_allowedExtensions.Contains(fileExtension)) { _uploadResultMessage = $"Invalid file type. Allowed: {string.Join(", ", _allowedExtensions)}"; _uploadSuccess = false; return false; }
+
+    _uploadResultMessage = null; // Clear message if valid
+    return true;
+    }
+
+    private void TryDeleteFile(string? filePath)
+    {
+    if (filePath != null && File.Exists(filePath))
+    {
+    try { File.Delete(filePath); Logger.LogWarning("Cleaned up file '{FilePath}' due to upload error.", filePath); }
+    catch (Exception delEx) { Logger.LogError(delEx, "Failed to clean up file '{FilePath}' after upload error.", filePath); }
+    }
+    }
+
+    private string FormatFileSize(long bytes)
+    {
+    const long k = 1024, m = k * k, g = m * k;
+    if (bytes < 0) return "?"; if (bytes == 0) return "0 B";
+    if (bytes < k) return $"{bytes} B"; if (bytes < m) return $"{(double)bytes / k:F1} KB";
+    if (bytes < g) return $"{(double)bytes / m:F1} MB"; return $"{(double)bytes / g:F1} GB";
+    }
+}
+
+
+-->
