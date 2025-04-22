@@ -3,18 +3,16 @@
 @layout AdminLayout
 @rendermode InteractiveServer
 
-@* --- AUTHORIZATION TEMPORARILY DISABLED FOR DEMO --- *@
+@* Authorization remains commented out for demo *@
 @* @attribute [Authorize(Roles = "Admin")] *@
-@* --- REMEMBER TO RE-ENABLE AUTHORIZATION AFTER DEMO --- *@
 
 @* Using Statements *@
 @using System.ComponentModel.DataAnnotations
 @using System.IO
-@using System.Text.Json;
-@using System.Net.Http; // <<< ADDED THIS LINE
+@using System.Security // For SecurityException
 @using LehmanCustomConstruction.Data
 @using LehmanCustomConstruction.Data.Common
-@using Microsoft.AspNetCore.Components.Forms
+@using Microsoft.AspNetCore.Components.Forms // Needed for EditForm, InputFile
 @using Microsoft.AspNetCore.Identity
 @using Microsoft.EntityFrameworkCore
 @using Microsoft.Extensions.Configuration
@@ -22,6 +20,7 @@
 @using Radzen
 @using Radzen.Blazor
 @*@using Microsoft.AspNetCore.Authorization*@
+
 
 @* Service Injections *@
 @inject ApplicationDbContext DbContext
@@ -31,55 +30,93 @@
 @inject IConfiguration Configuration
 @inject NotificationService NotificationService
 
-@* --- CSS STYLES FOR DRAG & DROP ZONE --- *@
-<style>
-    #adminUploadWithDragAndDrop { min-height: 200px; border: 2px dashed var(--rz-border-base-color, #dee2e6); /*...*/ }
-    #adminUploadWithDragAndDrop.rz-fileupload-highlight { background-color: var(--rz-primary-lighter, #cfe2ff) !important; /*...*/ }
-    #adminUploadWithDragAndDrop .rz-fileupload-choose { background-color: transparent !important; /*...*/ }
-    #adminUploadWithDragAndDrop .rz-fileupload-choose span { margin: 0 !important; }
-    #adminUploadWithDragAndDrop .rz-fileupload-content { padding: 0.5rem; border: none; }
-    #adminUploadWithDragAndDrop .rz-fileupload-row > div { padding: 0.3rem 0.5rem; }
-    #adminUploadWithDragAndDrop .rz-progressbar { height: 6px; }
-</style>
 
 <PageTitle>Manage Documents for Customer</PageTitle>
 
-@if (_isLoading) { <RadzenProgressBar Value="100" ShowValue="false" Mode="ProgressBarMode.Indeterminate" Style="margin-bottom: 20px" /><p><em>Loading...</em></p> }
-else if (_customer == null) { <div class="rz-card card rz-shadow-3 rz-my-12" style="padding: 2rem;"><!-- Error Display --></div> }
-else {
-    @* --- Customer Header --- *@
+@if (_isLoading)
+{
+    <RadzenProgressBar Value="100" ShowValue="false" Mode="ProgressBarMode.Indeterminate" Style="margin-bottom: 20px" />
+    <p><em>Loading...</em></p>
+}
+else if (_customer == null)
+{
+    <div class="rz-card card rz-shadow-3 rz-my-12" style="padding: 2rem;">
+        <div class="rz-text-danger rz-text-align-center rz-display-flex rz-align-items-center rz-justify-content-center">
+            <RadzenIcon Icon="error_outline" Style="font-size: 2rem; margin-right: 0.5rem;" />
+            <span class="rz-text-h6">Error: Customer with ID '@CustomerId' not found.</span>
+        </div>
+        <div class="rz-text-align-center rz-mt-4">
+            <RadzenButton Click='() => NavigationManager.NavigateTo("/admin/customers")' Text="Back to Customers" Icon="arrow_back" ButtonStyle="ButtonStyle.Secondary" />
+        </div>
+    </div>
+}
+else
+{
+    @* Customer Header *@
     <h3 class="text-2xl font-semibold text-primary dark:text-gray-100 mb-2 font-serif">Manage Documents for: @_customer.UserName</h3>
     <p class="text-secondary dark:text-gray-400 mb-6">ID: @_customer.Id | Email: @_customer.Email</p>
 
-    @* --- Admin Upload Section (Using Radzen Example UI) --- *@
-    <RadzenCard Variant="Variant.Outlined" class="mb-8">
-        <RadzenText TextStyle="TextStyle.Subtitle2" TagName="TagName.H3" class="mb-4">Upload Document(s) for Customer (Drag & Drop)</RadzenText>
-        <RadzenUpload id="adminUploadWithDragAndDrop" @ref="uploadComponent"
-                      ChooseText="Drag and Drop files here or Click to Browse"
-                      Accept="@_allowedExtensionsString" Url="@UploadUrl" Multiple="true" Auto="false"
-                      Style="width: 100%; margin-bottom: 1rem;" InputAttributes="@(new Dictionary<string,object>(){ { "aria-label", "select file" }})"
-                      Progress=@OnUploadProgress Complete=@OnUploadComplete Error=@OnUploadError />
-        <RadzenButton Text="Upload Selected Files" Click=@TriggerUpload class="rz-mt-2" ButtonStyle="ButtonStyle.Success" Icon="upload" IsBusy=@isUploading Disabled=@isUploading />
-         @if(isUploading || uploadProgress > 0) { <RadzenProgressBar Value="@uploadProgress" Unit="%" Visible="@(isUploading || uploadProgress > 0)" Style="margin-top: 1rem;" /> }
-    </RadzenCard>
+    @* Admin Upload Section (Using InputFile) *@
+    <div class="bg-white dark:bg-gray-800 border border-subtle dark:border-gray-700 rounded-lg shadow-sm p-6 mb-8">
+        <h4 class="text-xl font-semibold text-primary dark:text-gray-100 mb-4 font-serif">Upload Document(s) for Customer</h4>
+        @if (!string.IsNullOrEmpty(_userFeedbackMessage))
+        {
+            <div class="@(_feedbackSuccess ? "bg-green-100 border border-green-400 text-green-700 dark:bg-green-900/50 dark:border-green-600 dark:text-green-300" : "bg-red-100 border border-red-400 text-red-700 dark:bg-red-900/50 dark:border-red-600 dark:text-red-300") px-4 py-3 rounded relative mb-4" role="alert"><span class="block sm:inline">@_userFeedbackMessage</span></div>
+        }
+        <EditForm Model="_uploadModel" OnValidSubmit="HandleAdminUpload">
+            <DataAnnotationsValidator />
+            <div class="mb-4">
+                <label for="adminDocumentFile" class="block text-sm font-medium text-primary dark:text-gray-300 mb-1">Select File(s)</label>
+                <InputFile id="adminDocumentFile" OnChange="HandleFileSelected" multiple class="block w-full text-sm text-gray-500 dark:text-gray-400 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-accent/10 dark:file:bg-accent/20 file:text-accent dark:file:text-accent/90 hover:file:bg-accent/20 dark:hover:file:bg-accent/30" accept="@_allowedExtensionsString" />
+                <ValidationMessage For="@(() => _uploadModel.FilesToUpload)" class="text-red-600 dark:text-red-400 text-xs mt-1" />
+                @if (_isFileLoading)
+                {
+                    <p class="text-sm text-blue-600 dark:text-blue-400 mt-1">Processing...</p>
+                }
+                else if (_uploadModel.FilesToUpload.Any())
+                {
+                    <p class="mt-1 text-xs text-secondary dark:text-gray-400">Selected: @_uploadModel.FilesToUpload.Count file(s)</p>
+                }
+                else
+                {
+                    <p class="mt-1 text-xs text-secondary dark:text-gray-400">Max size: @(_maxFileSize / (1024 * 1024)) MB. Allowed: @string.Join(", ", _allowedExtensions.Select(ext => ext.ToUpperInvariant()))</p>
+                }
+            </div>
+            <div class="mb-4">
+                <label for="adminDocDescription" class="block text-sm font-medium text-primary dark:text-gray-300">Description (Optional - applies to all selected files)</label>
+                <InputText id="adminDocDescription" @bind-Value="_uploadModel.Description" placeholder="Enter a brief description..." class="mt-1 block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:border-accent focus:ring-accent sm:text-sm bg-white dark:bg-gray-700 text-primary dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500" />
+                <ValidationMessage For="@(() => _uploadModel.Description)" class="text-red-600 dark:text-red-400 text-xs mt-1" />
+            </div>
+            <button type="submit" disabled="@(!_uploadModel.FilesToUpload.Any() || _isUploading)" class="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-accent hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-gray-800 focus:ring-accent disabled:opacity-50 disabled:cursor-not-allowed">
+                @if (_isUploading)
+                {
+                    <span><svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-white inline" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>Uploading...</span>
+                }
+                else
+                {
+                    <span><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5 -ml-1 mr-2 inline"><path fill-rule="evenodd" d="M10 3.75a.75.75 0 0 1 .75.75v6.19l1.72-1.72a.75.75 0 1 1 1.06 1.06l-3 3a.75.75 0 0 1-1.06 0l-3-3a.75.75 0 1 1 1.06-1.06l1.72 1.72V4.5a.75.75 0 0 1 .75-.75Z" clip-rule="evenodd" /><path fill-rule="evenodd" d="M5.5 17a.5.5 0 0 1 .5-.5h8a.5.5 0 0 1 0 1H6a.5.5 0 0 1-.5-.5Z" clip-rule="evenodd" /></svg>Upload Selected Files</span>
+                }
+            </button>
+        </EditForm>
+    </div>
 
-    @* --- Existing Documents Grid --- *@
+    @* Existing Documents Grid *@
     <div class="bg-white dark:bg-gray-800 border border-subtle dark:border-gray-700 rounded-lg shadow-sm p-6">
         <h4 class="text-xl font-semibold text-primary dark:text-gray-100 mb-4 font-serif">Active Documents</h4>
         <RadzenDataGrid Data="@_documents" TItem="CustomerDocument" AllowSorting="true" AllowPaging="true" PageSize="10" PagerHorizontalAlign="HorizontalAlign.Left" ShowPagingSummary="true" AllowFiltering="true" FilterCaseSensitivity="FilterCaseSensitivity.CaseInsensitive" Density="Density.Compact" Style="width: 100%;" EmptyText="No active documents found for this customer." IsLoading="@_isLoadingDocuments" PagerAlwaysVisible="true" PageSizeOptions="new int[] { 5, 10, 20, 50 }">
-             <Columns>
-                 <RadzenDataGridColumn TItem="CustomerDocument" Property="OriginalFileName" Title="File Name" Width="250px" />
-                 <RadzenDataGridColumn TItem="CustomerDocument" Property="UploadTimestamp" Title="Uploaded On" FormatString="{0:yyyy-MM-dd HH:mm}" Width="160px" TextAlign="TextAlign.Center" />
-                 <RadzenDataGridColumn TItem="CustomerDocument" Title="Size" Property="FileSize" Sortable="true" Filterable="false" Width="100px" TextAlign="TextAlign.Right"><Template Context="doc"> @FormatFileSize(doc.FileSize) </Template></RadzenDataGridColumn>
-                 <RadzenDataGridColumn TItem="CustomerDocument" Property="Description" Title="Description" Width="200px" />
-                 <RadzenDataGridColumn TItem="CustomerDocument" Title="Uploaded By ID" Property="UploadedById" Width="150px" Visible="true"><Template Context="doc"> <span class="text-xs text-secondary dark:text-gray-400">@doc.UploadedById</span> </Template></RadzenDataGridColumn>
-                 <RadzenDataGridColumn TItem="CustomerDocument" Title="Actions" Sortable="false" Filterable="false" Width="160px" TextAlign="TextAlign.Center">
-                     <Template Context="doc">
-                         <RadzenButton ButtonStyle="ButtonStyle.Success" Icon="download" Size="ButtonSize.Small" Click=@(() => NavigationManager.NavigateTo($"/download/{doc.Id}", forceLoad: true)) class="rz-mr-1" />
-                         <RadzenButton ButtonStyle="ButtonStyle.Danger" Icon="delete" Size="ButtonSize.Small" Click=@(args => ConfirmDeleteDocument(doc)) />
-                     </Template>
-                 </RadzenDataGridColumn>
-             </Columns>
+            <Columns>
+                <RadzenDataGridColumn TItem="CustomerDocument" Property="OriginalFileName" Title="File Name" Width="250px" />
+                <RadzenDataGridColumn TItem="CustomerDocument" Property="UploadTimestamp" Title="Uploaded On" FormatString="{0:yyyy-MM-dd HH:mm}" Width="160px" TextAlign="TextAlign.Center" />
+                <RadzenDataGridColumn TItem="CustomerDocument" Title="Size" Property="FileSize" Sortable="true" Filterable="false" Width="100px" TextAlign="TextAlign.Right"><Template Context="doc"> @FormatFileSize(doc.FileSize) </Template></RadzenDataGridColumn>
+                <RadzenDataGridColumn TItem="CustomerDocument" Property="Description" Title="Description" Width="200px" />
+                <RadzenDataGridColumn TItem="CustomerDocument" Title="Uploaded By ID" Property="UploadedById" Width="150px" Visible="true"><Template Context="doc"> <span class="text-xs text-secondary dark:text-gray-400">@doc.UploadedById</span> </Template></RadzenDataGridColumn>
+                <RadzenDataGridColumn TItem="CustomerDocument" Title="Actions" Sortable="false" Filterable="false" Width="160px" TextAlign="TextAlign.Center">
+                    <Template Context="doc">
+                        <RadzenButton ButtonStyle="ButtonStyle.Success" Icon="download" Size="ButtonSize.Small" Click=@(() => NavigationManager.NavigateTo($"/download/{doc.Id}", forceLoad: true)) class="rz-mr-1" />
+                        <RadzenButton ButtonStyle="ButtonStyle.Danger" Icon="delete" Size="ButtonSize.Small" Click=@(args => ConfirmDeleteDocument(doc)) />
+                    </Template>
+                </RadzenDataGridColumn>
+            </Columns>
         </RadzenDataGrid>
     </div>
 }
@@ -90,42 +127,80 @@ else {
     private List<CustomerDocument>? _documents;
     private bool _isLoading = true;
     private bool _isLoadingDocuments = false;
-    private RadzenUpload? uploadComponent;
-    private bool isUploading = false;
-    private int uploadProgress = 0;
-    private string UploadUrl => $"api/upload/admin/{CustomerId}";
-    private readonly string _allowedExtensionsString = string.Join(",", new List<string> { ".pdf", ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx", ".txt", ".csv", ".jpg", ".jpeg", ".png", ".gif", ".bmp", ".tif", ".tiff", ".webp" });
 
-    protected override async Task OnParametersSetAsync() { if (string.IsNullOrEmpty(CustomerId) || !Guid.TryParse(CustomerId, out _)) { Logger.LogError("Admin Docs: Invalid Customer ID '{RawCustomerId}'", CustomerId); _customer = null; _isLoading = false; return; } await LoadCustomerData(); }
-    private async Task LoadCustomerData() { _isLoading = true; _isLoadingDocuments = true; await InvokeAsync(StateHasChanged); try { _customer = await DbContext.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == CustomerId); if (_customer != null) { _documents = await DbContext.CustomerDocuments.Where(d => d.TargetUserId == CustomerId && !d.IsDeleted).OrderByDescending(d => d.UploadTimestamp).AsNoTracking().ToListAsync(); Logger.LogInformation("Loaded {DocCount} docs for admin view of {CustomerId}", _documents?.Count ?? 0, CustomerId); } else { Logger.LogWarning("Admin Docs: Customer {CustomerId} not found.", CustomerId); _documents = new List<CustomerDocument>(); } } catch (Exception ex) { Logger.LogError(ex, "Admin Docs: Error loading data for {CustomerId}", CustomerId); NotificationService.Notify(NotificationSeverity.Error, "Load Error", $"Failed data load: {ex.Message}"); _customer = null; _documents = null; } finally { _isLoading = false; _isLoadingDocuments = false; await InvokeAsync(StateHasChanged); } }
-    private string FormatFileSize(long bytes) { const long k=1024,m=k*k,g=m*k;if(bytes<0)return "?";if(bytes==0)return "0 B";if(bytes<k)return $"{bytes} B";if(bytes<m)return $"{(double)bytes/k:F1} KB";if(bytes<g)return $"{(double)bytes/m:F1} MB";return $"{(double)bytes/g:F1} GB"; }
-    private async Task ConfirmDeleteDocument(CustomerDocument docToDelete) { if (docToDelete == null) return; var confirmed = await DialogService.Confirm($"Mark '{docToDelete.OriginalFileName}' as deleted?", "Confirm Deletion", new ConfirmOptions { OkButtonText = "Yes, Mark Deleted", CancelButtonText = "No, Cancel" }); if (confirmed == true) { await DeleteDocument(docToDelete); } }
-    private async Task DeleteDocument(CustomerDocument docToDelete) { _isLoadingDocuments = true; await InvokeAsync(StateHasChanged); try { var trackedDoc = await DbContext.CustomerDocuments.FindAsync(docToDelete.Id); if (trackedDoc == null || trackedDoc.IsDeleted) { Logger.LogWarning("Soft Delete skipped: Doc ID {DocId} not found or already deleted.", docToDelete.Id); NotificationService.Notify(NotificationSeverity.Info, "Skipped", "Document not found or already deleted."); return; } trackedDoc.IsDeleted = true; await DbContext.SaveChangesAsync(); Logger.LogInformation("Soft-deleted doc ID {DocId}", trackedDoc.Id); NotificationService.Notify(NotificationSeverity.Success, "Success", $"Document '{trackedDoc.OriginalFileName}' marked as deleted."); await LoadCustomerData(); } catch (Exception ex) { Logger.LogError(ex, "Error during soft delete for doc ID {DocId}", docToDelete.Id); NotificationService.Notify(NotificationSeverity.Error,"Delete Error", $"Error deleting document: {ex.Message}"); } finally { _isLoadingDocuments = false; await InvokeAsync(StateHasChanged); } }
-    void TriggerUpload() { if (uploadComponent == null) { NotificationService.Notify(NotificationSeverity.Error, "Error", "Upload component error."); return; } Logger.LogInformation("Admin triggering upload to {UploadUrl}", UploadUrl); isUploading = true; uploadProgress = 0; InvokeAsync(StateHasChanged); uploadComponent.Upload(); }
-    void OnUploadProgress(UploadProgressArgs args) { uploadProgress = args.Progress; if (args.Progress == 100) { Logger.LogInformation("Admin upload transfer complete for {FileCount} files.", args.Files.Count()); } InvokeAsync(StateHasChanged); }
-    // --- CORRECTED OnUploadComplete ---
-    async Task OnUploadComplete(UploadCompleteEventArgs args)
+    private UploadModel _uploadModel = new();
+    private bool _isFileLoading = false;
+    private bool _isUploading = false;
+    private string? _userFeedbackMessage;
+    private bool _feedbackSuccess;
+
+    private const string PlaceholderAdminId = "683a96be-9b4a-4af7-a863-b98a88815cae";
+
+    private long _maxFileSize;
+    private string _baseUploadDirectory = string.Empty;
+    private readonly HashSet<string> _allowedExtensions = new(StringComparer.OrdinalIgnoreCase) { ".pdf", ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx", ".txt", ".csv", ".jpg", ".jpeg", ".png", ".gif", ".bmp", ".tif", ".tiff", ".webp" };
+    private string _allowedExtensionsString => string.Join(",", _allowedExtensions);
+
+    private class UploadModel
     {
-        isUploading = false; uploadProgress = 0; string serverMessage = "Upload processed.";
-        // Access response properties directly from args.RawResponse (HttpResponseMessage)
-        bool serverSuccess = args.RawResponse.IsSuccessStatusCode;
-        System.Net.HttpStatusCode statusCode = args.RawResponse.StatusCode; // Get status code
+        [Required(ErrorMessage = "Please select at least one file.")]
+        [MinLength(1, ErrorMessage = "Please select at least one file.")]
+        public List<IBrowserFile> FilesToUpload { get; set; } = new();
+        [StringLength(500)] public string? Description { get; set; }
+    }
 
-        try { if (args.JsonResponse?.RootElement.TryGetProperty("message", out var msg) == true) serverMessage = msg.GetString() ?? serverMessage; } catch (Exception ex) { Logger.LogWarning(ex, "Could not parse JSON message from admin upload response."); }
+    protected override void OnInitialized()
+    {
+        _maxFileSize = Configuration.GetValue<long>("FileUploadSettings:MaxFileSizeMB", 20) * 1024 * 1024;
+        _baseUploadDirectory = Configuration["FileUploadSettings:BasePath"] ?? "";
+        if (string.IsNullOrWhiteSpace(_baseUploadDirectory) || !Path.IsPathRooted(_baseUploadDirectory)) { Logger.LogError("BasePath '{Path}' is missing/invalid.", _baseUploadDirectory); _baseUploadDirectory = ""; }
+        else { Logger.LogInformation("Admin Docs Init. Base Path: {Path}", _baseUploadDirectory); }
+    }
+    protected override async Task OnParametersSetAsync() { await LoadCustomerData(); }
 
-        if (serverSuccess)
+    private async Task LoadCustomerData() { _isLoading = true; _isLoadingDocuments = true; _userFeedbackMessage = null; await InvokeAsync(StateHasChanged); if (string.IsNullOrEmpty(CustomerId)) { _isLoading = false; _isLoadingDocuments = false; _userFeedbackMessage = "Error: No Customer ID provided."; _feedbackSuccess = false; await InvokeAsync(StateHasChanged); return; } try { _customer = await DbContext.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == CustomerId); if (_customer != null) { _documents = await DbContext.CustomerDocuments.Where(d => d.TargetUserId == CustomerId && !d.IsDeleted).OrderByDescending(d => d.UploadTimestamp).AsNoTracking().ToListAsync(); Logger.LogInformation("Loaded {DocCount} non-deleted docs for customer {CustomerId}", _documents?.Count ?? 0, CustomerId); } else { Logger.LogWarning("Admin Docs: Customer {CustomerId} not found.", CustomerId); _documents = new List<CustomerDocument>(); } } catch (Exception ex) { Logger.LogError(ex, "Admin Docs: Error loading data for {CustomerId}", CustomerId); NotificationService.Notify(NotificationSeverity.Error, "Load Error", $"Failed data load: {ex.Message}"); _customer = null; _documents = null; _userFeedbackMessage = "Error loading data."; _feedbackSuccess = false; } finally { _isLoading = false; _isLoadingDocuments = false; await InvokeAsync(StateHasChanged); } }
+    private string FormatFileSize(long bytes) { const long k = 1024, m = k * k, g = m * k; if (bytes < 0) return "?"; if (bytes == 0) return "0 B"; if (bytes < k) return $"{bytes} B"; if (bytes < m) return $"{(double)bytes / k:F1} KB"; if (bytes < g) return $"{(double)bytes / m:F1} MB"; return $"{(double)bytes / g:F1} GB"; }
+    private async Task ConfirmDeleteDocument(CustomerDocument docToDelete) { if (docToDelete == null) return; var confirmed = await DialogService.Confirm($"Mark '{docToDelete.OriginalFileName}' as deleted?", "Confirm Deletion", new ConfirmOptions { OkButtonText = "Yes, Mark Deleted", CancelButtonText = "No, Cancel" }); if (confirmed == true) { await DeleteDocument(docToDelete); } }
+    private async Task DeleteDocument(CustomerDocument docToDelete) { _isLoadingDocuments = true; await InvokeAsync(StateHasChanged); try { var trackedDoc = await DbContext.CustomerDocuments.FindAsync(docToDelete.Id); if (trackedDoc == null || trackedDoc.IsDeleted) { Logger.LogWarning("Soft Delete skipped: Doc ID {DocId} not found/deleted.", docToDelete.Id); NotificationService.Notify(NotificationSeverity.Info, "Skipped", "Doc not found/deleted."); return; } trackedDoc.IsDeleted = true; await DbContext.SaveChangesAsync(); Logger.LogInformation("Soft-deleted doc ID {DocId}", trackedDoc.Id); NotificationService.Notify(NotificationSeverity.Success, "Success", $"Doc '{trackedDoc.OriginalFileName}' marked deleted."); await LoadCustomerData(); } catch (Exception ex) { Logger.LogError(ex, "Error soft delete doc ID {DocId}", docToDelete.Id); NotificationService.Notify(NotificationSeverity.Error, "Delete Error", $"Error deleting: {ex.Message}"); } finally { _isLoadingDocuments = false; await InvokeAsync(StateHasChanged); } }
+
+    private async Task HandleFileSelected(InputFileChangeEventArgs e)
+    {
+        _isFileLoading = true; _userFeedbackMessage = null; _uploadModel.FilesToUpload.Clear(); _feedbackSuccess = false;
+        await InvokeAsync(StateHasChanged);
+        List<IBrowserFile> validFiles = new();
+        try { foreach (var file in e.GetMultipleFiles(100)) { if (ValidateFile(file)) { validFiles.Add(file); } else { NotificationService.Notify(NotificationSeverity.Warning, "Invalid File", $"{file.Name}: {_userFeedbackMessage}"); } } _uploadModel.FilesToUpload = validFiles; if (!validFiles.Any() && e.FileCount > 0) { _userFeedbackMessage = "No valid files selected."; _feedbackSuccess = false; } else { _userFeedbackMessage = null; } }
+        catch (Exception ex) { Logger.LogError(ex, "Error selecting files."); _userFeedbackMessage = $"Error selecting files: {ex.Message}"; _feedbackSuccess = false; }
+        finally { _isFileLoading = false; await InvokeAsync(StateHasChanged); }
+    }
+
+    private async Task HandleAdminUpload()
+    {
+        if (!_uploadModel.FilesToUpload.Any()) { _userFeedbackMessage = "Please select valid file(s) first."; _feedbackSuccess = false; NotificationService.Notify(NotificationSeverity.Warning, "No Files", _userFeedbackMessage); return; }
+        if (_isUploading) return;
+        if (string.IsNullOrEmpty(_baseUploadDirectory)) { _userFeedbackMessage = "Upload config error."; _feedbackSuccess = false; NotificationService.Notify(NotificationSeverity.Error, "Config Error", "Base upload path not set."); return; }
+
+        _isUploading = true; _userFeedbackMessage = null; await InvokeAsync(StateHasChanged);
+        var uploaderUserId = PlaceholderAdminId;
+        List<CustomerDocument> savedDocs = new(); bool anyError = false; string? collectiveDescription = _uploadModel.Description?.Trim();
+
+        foreach (var file in _uploadModel.FilesToUpload)
         {
-             Logger.LogInformation("Admin upload successful. Status: {StatusCode}", statusCode);
-             NotificationService.Notify(NotificationSeverity.Success, "Upload Complete", serverMessage);
-             await LoadCustomerData();
-        }
-        else
-        {
-             Logger.LogError("Admin upload failed. Status: {StatusCode}, Response: {Response}", statusCode, args.RawResponse);
-             NotificationService.Notify(NotificationSeverity.Error, "Upload Failed", serverMessage);
-        }
-        if (uploadComponent != null && serverSuccess) { /* uploadComponent.Clear(); */ }
+            long currentFileSize = 0; try { currentFileSize = file.Size; } catch (Exception ex) { Logger.LogError(ex, "Size error for {FileName}", file.Name); anyError = true; NotificationService.Notify(NotificationSeverity.Error, $"File Error: {file.Name}", "Could not read size."); continue; }
+            if (!ValidateFile(file, currentFileSize)) { anyError = true; continue; }
+            string userDirectory = Path.Combine(_baseUploadDirectory, CustomerId); string safeOriginalFileName = Path.GetFileName(file.Name); string uniqueFileName = $"{Guid.NewGuid()}{Path.GetExtension(safeOriginalFileName)}"; string filePath = Path.Combine(userDirectory, uniqueFileName); string? savedFilePath = null;
+            try { Directory.CreateDirectory(userDirectory); var fullDirectoryPath = Path.GetFullPath(userDirectory); var fullFilePath = Path.GetFullPath(filePath); if (!fullFilePath.StartsWith(fullDirectoryPath, StringComparison.OrdinalIgnoreCase)) { throw new SecurityException($"Path error for {safeOriginalFileName}."); } Logger.LogInformation("Admin Saving '{Original}' ({Size}) for {TargetUser} by {UploaderUser} to {Path}", safeOriginalFileName, currentFileSize, CustomerId, uploaderUserId, filePath); await using FileStream fs = new(filePath, FileMode.Create); using var stream = file.OpenReadStream(_maxFileSize); await stream.CopyToAsync(fs); savedFilePath = filePath; Logger.LogInformation("Saved: {Path}", filePath); var document = new CustomerDocument { OriginalFileName = safeOriginalFileName, StoredFileName = uniqueFileName, ContentType = file.ContentType ?? "application/octet-stream", FileSize = currentFileSize, UploadTimestamp = DateTime.UtcNow, Description = collectiveDescription, UploadedById = uploaderUserId, TargetUserId = CustomerId, IsDeleted = false }; DbContext.CustomerDocuments.Add(document); await DbContext.SaveChangesAsync(); Logger.LogInformation("DB record created ID: {DocId}", document.Id); savedDocs.Add(document); }
+            catch (UnauthorizedAccessException authEx) { anyError = true; Logger.LogError(authEx, "PERMISSION ERROR saving file '{Original}' for target {TargetUser} to '{Path}'. Check IIS/Kestrel process permissions.", safeOriginalFileName, CustomerId, filePath); _userFeedbackMessage = $"Server permission error saving {safeOriginalFileName}."; NotificationService.Notify(NotificationSeverity.Error, $"Upload Error: {safeOriginalFileName}", "Server permission error."); }
+            catch (Exception ex) { anyError = true; Logger.LogError(ex, "Error uploading file '{Original}' for target {TargetUser}", safeOriginalFileName, CustomerId); _userFeedbackMessage = $"Error uploading {safeOriginalFileName}: {ex.Message}"; NotificationService.Notify(NotificationSeverity.Error, $"Upload Error: {safeOriginalFileName}", ex.Message); TryDeleteFile(savedFilePath); }
+        } // End foreach
+
+        _isUploading = false; _uploadModel = new(); // Reset form
+        if (savedDocs.Any() && !anyError) { _userFeedbackMessage = $"{savedDocs.Count} file(s) uploaded."; _feedbackSuccess = true; NotificationService.Notify(NotificationSeverity.Success, "Upload Complete", _userFeedbackMessage); await LoadCustomerData(); }
+        else if (savedDocs.Any() && anyError) { _userFeedbackMessage = $"Partial success: {savedDocs.Count} uploaded, some failed."; _feedbackSuccess = false; NotificationService.Notify(NotificationSeverity.Warning, "Partial Upload", _userFeedbackMessage); await LoadCustomerData(); }
+        else if (anyError) { _feedbackSuccess = false; } else { _userFeedbackMessage ??= "No valid files were selected."; _feedbackSuccess = false; }
         await InvokeAsync(StateHasChanged);
     }
-    void OnUploadError(UploadErrorEventArgs args) { Logger.LogError("Admin Upload Client Error: {Message}", args.Message); NotificationService.Notify(NotificationSeverity.Error, "Upload Error", $"Could not upload: {args.Message}"); isUploading = false; uploadProgress = 0; InvokeAsync(StateHasChanged); }
+
+    private bool ValidateFile(IBrowserFile file, long fileSize) { if (file == null) { _userFeedbackMessage = "No file selected."; _feedbackSuccess = false; return false; } if (fileSize == 0) { _userFeedbackMessage = $"Cannot upload empty file: {file.Name}."; _feedbackSuccess = false; return false; } if (fileSize > _maxFileSize) { _userFeedbackMessage = $"File {file.Name} exceeds size limit ({FormatFileSize(_maxFileSize)})."; _feedbackSuccess = false; return false; } var fileExtension = Path.GetExtension(file.Name); if (string.IsNullOrEmpty(fileExtension) || !_allowedExtensions.Contains(fileExtension)) { _userFeedbackMessage = $"Invalid file type: {file.Name}. Allowed: {string.Join(", ", _allowedExtensions.Select(ext => ext.ToUpperInvariant()))}"; _feedbackSuccess = false; return false; } _userFeedbackMessage = null; return true; }
+    private bool ValidateFile(IBrowserFile file) { long size = 0; try { size = file.Size; } catch (Exception ex) { Logger.LogWarning(ex, "Could not access initial size for {FileName} during selection validation.", file?.Name ?? "unknown file"); } if (file == null) { _userFeedbackMessage = "No file selected."; _feedbackSuccess = false; return false; } var fileExtension = Path.GetExtension(file.Name); if (string.IsNullOrEmpty(fileExtension) || !_allowedExtensions.Contains(fileExtension)) { _userFeedbackMessage = $"Invalid file type: {file.Name}. Allowed: {string.Join(", ", _allowedExtensions.Select(ext => ext.ToUpperInvariant()))}"; _feedbackSuccess = false; return false; } if (size > 0 && size > _maxFileSize) { _userFeedbackMessage = $"File {file.Name} exceeds size limit ({FormatFileSize(_maxFileSize)})."; _feedbackSuccess = false; return false; } _userFeedbackMessage = null; return true; }
+    private void TryDeleteFile(string? filePath) { if (filePath != null && File.Exists(filePath)) { try { File.Delete(filePath); Logger.LogWarning("Cleaned up file '{FilePath}' due to upload error.", filePath); } catch (Exception delEx) { Logger.LogError(delEx, "Failed to clean up file '{FilePath}' after upload error.", filePath); } } }
 }

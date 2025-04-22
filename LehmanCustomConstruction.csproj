@@ -31,6 +31,7 @@
     <Folder Include="Components\Forms\" />
     <Folder Include="Components\UI\" />
     <Folder Include="Components\Portfolio\" />
+    <Folder Include="Controllers\" />
     <Folder Include="Data\Models\" />
     <Folder Include="Data\Portal\" />
     <Folder Include="Data\Portfolio\" />

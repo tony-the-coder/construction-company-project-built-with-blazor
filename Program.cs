@@ -17,25 +17,18 @@ using System.Security.Claims;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using System.IO;
-// No DemoAuthStateProvider needed for this approach
 
 var builder = WebApplication.CreateBuilder(args);
 
-// --- START: Service Registration ---
-
-// Add API Controller Services
-builder.Services.AddControllers();
-
+// --- Service Registration ---
+// NO AddControllers() here
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents(options => { options.DetailedErrors = true; });
 
-// Core Blazor & Identity Services
 builder.Services.AddCascadingAuthenticationState();
 builder.Services.AddScoped<IdentityUserAccessor>();
 builder.Services.AddScoped<IdentityRedirectManager>();
-// Use Standard AuthenticationStateProvider
-builder.Services.AddScoped<AuthenticationStateProvider, IdentityRevalidatingAuthenticationStateProvider>();
-
+builder.Services.AddScoped<AuthenticationStateProvider, IdentityRevalidatingAuthenticationStateProvider>(); // Standard provider
 builder.Services.AddAntiforgery();
 builder.Services.AddHttpContextAccessor();
 builder.Services.Configure<EmailSettings>(builder.Configuration.GetSection("EmailSettings"));
@@ -59,8 +52,7 @@ builder.Services.AddAuthentication(options =>
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection") ?? throw new InvalidOperationException("Connection string 'DefaultConnection' not found.");
 
 // DbContext Configuration
-builder.Services.AddDbContext<ApplicationDbContext>(options =>
-    options.UseSqlServer(connectionString), ServiceLifetime.Scoped);
+builder.Services.AddDbContext<ApplicationDbContext>(options => options.UseSqlServer(connectionString), ServiceLifetime.Scoped);
 builder.Services.AddDatabaseDeveloperPageExceptionFilter();
 
 // Identity Core Configuration
@@ -74,30 +66,25 @@ builder.Services.AddSingleton<IEmailSender<ApplicationUser>, IdentityNoOpEmailSe
 // Radzen Services
 builder.Services.AddRadzenComponents();
 
-// --- END: Service Registration ---
+// --- END Service Registration ---
 
 var app = builder.Build();
 
-// --- START: Middleware Pipeline Configuration ---
+// --- Middleware ---
 if (app.Environment.IsDevelopment()) { app.UseMigrationsEndPoint(); app.UseDeveloperExceptionPage(); }
 else { app.UseExceptionHandler("/Error", createScopeForErrors: true); app.UseHsts(); }
 
 app.UseHttpsRedirection();
 app.UseStaticFiles();
 app.UseRouting();
-
-// Keep Auth middleware
 app.UseAuthentication();
 app.UseAuthorization();
-
 app.UseAntiforgery();
 
 // --- Endpoint Mapping ---
 app.MapRazorComponents<App>().AddInteractiveServerRenderMode();
 app.MapAdditionalIdentityEndpoints();
-
-// Map API Controllers (for UploadController)
-app.MapControllers();
+// NO MapControllers() here
 
 // File Download Minimal API Endpoint (Auth Disabled for Demo)
 app.MapGet("/download/{id:int}", async (int id, ApplicationDbContext dbContext, IConfiguration configuration, ILogger<Program> logger) =>
@@ -106,9 +93,8 @@ app.MapGet("/download/{id:int}", async (int id, ApplicationDbContext dbContext, 
     var document = await dbContext.CustomerDocuments.FirstOrDefaultAsync(d => d.Id == id && !d.IsDeleted);
     if (document == null) { return Results.NotFound($"Document with ID {id} not found or marked as deleted."); }
     var basePath = configuration["FileUploadSettings:BasePath"];
-    if (string.IsNullOrWhiteSpace(basePath)) { logger.LogError("FileUploadSettings:BasePath not configured."); return Results.Problem("Server config error."); }
-    string userDirectory = Path.Combine(basePath, document.TargetUserId ?? "_unknown_user");
-    string filePath = Path.Combine(userDirectory, document.StoredFileName);
+    if (string.IsNullOrWhiteSpace(basePath)) { logger.LogError("BasePath not configured."); return Results.Problem("Server config error."); }
+    string userDirectory = Path.Combine(basePath, document.TargetUserId ?? "_unknown_user"); string filePath = Path.Combine(userDirectory, document.StoredFileName);
     var fullBasePath = Path.GetFullPath(basePath); var fullFilePath = Path.GetFullPath(filePath);
     if (!fullFilePath.StartsWith(fullBasePath, StringComparison.OrdinalIgnoreCase)) { logger.LogError("Path Traversal: Doc {DocumentId}, Path {FilePath}", id, filePath); return Results.BadRequest("Invalid path."); }
     if (document.StoredFileName.Contains("..") || document.StoredFileName.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0) { logger.LogError("Invalid Filename: Doc {DocumentId}, FileName {FileName}", id, document.StoredFileName); return Results.BadRequest("Invalid filename."); }
@@ -117,6 +103,5 @@ app.MapGet("/download/{id:int}", async (int id, ApplicationDbContext dbContext, 
     return Results.File(filePath, document.ContentType ?? "application/octet-stream", document.OriginalFileName);
 }); // No .RequireAuthorization()
 
-// --- END: Middleware Pipeline Configuration ---
-
+// --- END Middleware ---
 app.Run();
