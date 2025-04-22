@@ -66,6 +66,7 @@ builder.Services.AddSingleton<IEmailSender<ApplicationUser>, IdentityNoOpEmailSe
 // Radzen Services
 builder.Services.AddRadzenComponents();
 
+
 // --- END Service Registration ---
 
 var app = builder.Build();
