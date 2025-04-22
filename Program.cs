@@ -74,6 +74,107 @@ builder.Services.AddRadzenComponents();
 
 var app = builder.Build();
 
+
+// File: Program.cs (Place this section after "var app = builder.Build();")
+
+// === START: Seed Roles and Admin User (Run ONCE on startup) ===
+using (var scope = app.Services.CreateScope()) // Create a service scope to resolve services
+{
+    var services = scope.ServiceProvider;
+    var logger = services.GetRequiredService<ILogger<Program>>();
+    var roleManager = services.GetRequiredService<RoleManager<IdentityRole>>();
+    var userManager = services.GetRequiredService<UserManager<ApplicationUser>>();
+    var configuration = services.GetRequiredService<IConfiguration>(); // Get configuration
+
+    logger.LogInformation("Attempting to seed roles and admin user...");
+    try
+    {
+        // 1. Seed Roles
+        string[] roleNames = { "Admin", "Marketing", "OfficeAdmin", "Accounting" }; // Add/remove roles as needed
+        foreach (var roleName in roleNames)
+        {
+            var roleExist = await roleManager.RoleExistsAsync(roleName);
+            if (!roleExist)
+            {
+                var roleResult = await roleManager.CreateAsync(new IdentityRole(roleName));
+                if (roleResult.Succeeded)
+                {
+                    logger.LogInformation("Created Role: {RoleName}", roleName);
+                }
+                else
+                {
+                    // Log errors if role creation fails
+                    logger.LogError("Failed to create role {RoleName}: {Errors}", roleName, string.Join(", ", roleResult.Errors.Select(e => e.Description)));
+                }
+            }
+        }
+
+        // 2. Seed Initial Admin User
+        // IMPORTANT: Configure these in appsettings.Development.json or User Secrets!
+        string adminEmail = configuration["SeedAdmin:Email"] ?? "admin@lehman.test"; // Default if not configured
+        string adminPassword = configuration["SeedAdmin:Password"] ?? "TempP@ss123!"; // Default if not configured
+
+        var adminUser = await userManager.FindByEmailAsync(adminEmail);
+        if (adminUser == null)
+        {
+            adminUser = new ApplicationUser
+            {
+                UserName = adminEmail, // Use email as username by default
+                Email = adminEmail,
+                EmailConfirmed = true // IMPORTANT: Confirm email so they can log in immediately
+                // Add any other required user properties here if necessary
+            };
+            var createUserResult = await userManager.CreateAsync(adminUser, adminPassword);
+            if (createUserResult.Succeeded)
+            {
+                logger.LogInformation("Created Seed Admin User: {AdminEmail}", adminEmail);
+
+                // 3. Assign the 'Admin' role to the new Admin User
+                if (await roleManager.RoleExistsAsync("Admin")) // Ensure role exists before assigning
+                {
+                    var addToRoleResult = await userManager.AddToRoleAsync(adminUser, "Admin");
+                    if (addToRoleResult.Succeeded)
+                    {
+                        logger.LogInformation("Assigned 'Admin' role to {AdminEmail}", adminEmail);
+                    }
+                    else
+                    {
+                        logger.LogError("Failed to assign 'Admin' role to {AdminEmail}: {Errors}", adminEmail, string.Join(", ", addToRoleResult.Errors.Select(e => e.Description)));
+                    }
+                }
+                else
+                {
+                    logger.LogError("Cannot assign 'Admin' role: Role does not exist.");
+                }
+            }
+            else
+            {
+                logger.LogError("Failed to create seed admin user {AdminEmail}: {Errors}", adminEmail, string.Join(", ", createUserResult.Errors.Select(e => e.Description)));
+            }
+        }
+        else
+        {
+            logger.LogInformation("Admin user {AdminEmail} already exists. Ensuring Admin role assignment...", adminEmail);
+            // Optional: Ensure existing admin user has the Admin role if they somehow lost it
+            if (await roleManager.RoleExistsAsync("Admin") && !await userManager.IsInRoleAsync(adminUser, "Admin"))
+            {
+                var addToRoleResult = await userManager.AddToRoleAsync(adminUser, "Admin");
+                if (addToRoleResult.Succeeded) { logger.LogInformation("Ensured 'Admin' role is assigned to {AdminEmail}", adminEmail); }
+                else { logger.LogError("Failed to assign 'Admin' role to existing user {AdminEmail}: {Errors}", adminEmail, string.Join(", ", addToRoleResult.Errors.Select(e => e.Description))); }
+            }
+        }
+    }
+    catch (Exception ex)
+    {
+        logger.LogError(ex, "An error occurred during role/admin seeding.");
+        // Consider whether the app should fail to start if seeding fails critical roles/users
+        // throw;
+    }
+}
+// === END: Seed Roles and Admin User ===
+
+
+
 // --- Middleware ---
 if (app.Environment.IsDevelopment()) { app.UseMigrationsEndPoint(); app.UseDeveloperExceptionPage(); }
 else { app.UseExceptionHandler("/Error", createScopeForErrors: true); app.UseHsts(); }

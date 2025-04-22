@@ -219,8 +219,9 @@
         // Add logic here later if needed
     }
     
-    private void CancelClicked() 
-    { 
+    private void CancelClicked()
+    {
+        Logger.LogInformation("Cancel button clicked, navigating to /admin/blog"); // Inject ILogger<BlogPostForm> if not already done
         NavigationManager.NavigateTo("/admin/blog");
     }
 

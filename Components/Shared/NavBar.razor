@@ -1,83 +1,68 @@
 ﻿@* File: Components/Shared/NavBar.razor *@
-@using LehmanCustomConstruction.Components.Layout @* Needed for LoginDisplay *@
-@inject NavigationManager NavigationManager
+@using Microsoft.AspNetCore.Components.Authorization // Needed for AuthorizeView
+@using LehmanCustomConstruction.Components.Layout // Needed for LoginDisplay
 
-@* Apply theme background (or make transparent), padding, etc. *@
-@* Let's use a subtle background initially, can be changed in MainLayout's header tag if needed *@
-<nav class="bg-white border-b border-subtle shadow-sm" aria-label="Global">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        @* Constrain width *@
-        <div class="flex h-16 items-center justify-between">
-            @* Standard height *@
+@* Show this NavBar ONLY if the user is NOT logged in OR if they are logged in but DO NOT have any of the specified staff roles *@
+<AuthorizeView Roles="Admin, Marketing, OfficeAdmin, Accounting">
+    <NotAuthorized>
+        @* Show for anonymous users AND users NOT in the specified roles *@
+        <nav class="bg-white border-b border-subtle shadow-sm" aria-label="Global">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="flex h-16 items-center justify-between">
+                    @* Left Side: Logo *@
+                    <div class="flex items-center">
+                        <div class="flex-shrink-0">
+                            <a href="/" aria-label="Lehman Custom Construction Home">
+                                <img class="block h-10 w-auto" src="/images/Using-this-logo-during-dev.jpg" alt="Lehman Custom Construction Logo">
+                            </a>
+                        </div>
+                    </div>
 
-            @* Left Side: Logo *@
-            <div class="flex items-center">
-                <div class="flex-shrink-0">
-                    <a href="/" aria-label="Lehman Custom Construction Home">
-                        @* Use primary logo version on light background *@
-                        <img class="block h-10 w-auto" src="/images/Using-this-logo-during-dev.jpg" alt="Lehman Custom Construction Logo">
-                    </a>
+                    @* Center: Main Navigation Links (Desktop) *@
+                    <div class="hidden sm:ml-6 sm:flex sm:space-x-8">
+                        <a href="/about-us" class="inline-flex items-center border-b-2 border-transparent px-1 pt-1 text-sm font-medium text-primary hover:border-gray-300 hover:text-secondary">About Us</a>
+                        <a href="/blog" class="inline-flex items-center border-b-2 border-transparent px-1 pt-1 text-sm font-medium text-primary hover:border-gray-300 hover:text-secondary">Blog</a>
+                        <a href="/portfolio" class="inline-flex items-center border-b-2 border-transparent px-1 pt-1 text-sm font-medium text-primary hover:border-gray-300 hover:text-secondary">Portfolio</a> @* Added Portfolio Example *@
+                        <a href="/contact" class="inline-flex items-center border-b-2 border-transparent px-1 pt-1 text-sm font-medium text-primary hover:border-gray-300 hover:text-secondary">Contact</a>
+                    </div>
+
+                    @* Right Side: Login/User Status (Desktop) *@
+                    <div class="hidden sm:ml-6 sm:flex sm:items-center">
+                        <LoginDisplay />
+                    </div>
+
+                    @* Mobile Menu Button *@
+                    <div class="-mr-2 flex items-center sm:hidden">
+                        <button type="button" @onclick="ToggleMobileMenu" class="relative inline-flex items-center justify-center rounded-md bg-white p-2 text-primary hover:bg-gray-100 hover:text-secondary focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2" aria-controls="mobile-menu" aria-expanded="@isMobileMenuOpen">
+                            <span class="absolute -inset-0.5"></span>
+                            <span class="sr-only">Open main menu</span>
+                            <svg class="@(isMobileMenuOpen ? "hidden" : "block") h-6 w-6" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" /></svg>
+                            <svg class="@(isMobileMenuOpen ? "block" : "hidden") h-6 w-6" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+                        </button>
+                    </div>
                 </div>
             </div>
 
-            @* Center: Main Navigation Links (Desktop) *@
-            <div class="hidden sm:ml-6 sm:flex sm:space-x-8">
-                @* Use theme colors, sans font, add active link styling if desired later *@
-                <a href="/about-us"
-                   class="inline-flex items-center border-b-2 border-transparent px-1 pt-1 text-sm font-medium text-primary hover:border-gray-300 hover:text-secondary">
-                    About Us
-                </a>
-                <a href="/blog"
-                   class="inline-flex items-center border-b-2 border-transparent px-1 pt-1 text-sm font-medium text-primary hover:border-gray-300 hover:text-secondary">
-                    Blog
-                </a>
-                <a href="/contact"
-                   class="inline-flex items-center border-b-2 border-transparent px-1 pt-1 text-sm font-medium text-primary hover:border-gray-300 hover:text-secondary">
-                    Contact
-                </a>
-                @* Add other links like Portfolio later *@
+            @* Mobile Menu *@
+            <div class="@MobileMenuCssClass sm:hidden" id="mobile-menu">
+                <div class="space-y-1 px-2 pb-3 pt-2">
+                    <a href="/about-us" class="block rounded-md px-3 py-2 text-base font-medium text-primary hover:bg-gray-100 hover:text-secondary">About Us</a>
+                    <a href="/blog" class="block rounded-md px-3 py-2 text-base font-medium text-primary hover:bg-gray-100 hover:text-secondary">Blog</a>
+                    <a href="/portfolio" class="block rounded-md px-3 py-2 text-base font-medium text-primary hover:bg-gray-100 hover:text-secondary">Portfolio</a> @* Added Portfolio Example *@
+                    <a href="/contact" class="block rounded-md px-3 py-2 text-base font-medium text-primary hover:bg-gray-100 hover:text-secondary">Contact</a>
+                </div>
+                <div class="border-t border-subtle px-4 py-3">
+                    <LoginDisplay />
+                </div>
             </div>
-
-            @* Right Side: Login/User Status (Desktop) *@
-            <div class="hidden sm:ml-6 sm:flex sm:items-center">
-                <LoginDisplay /> @* <<< INTEGRATED HERE <<< *@
-            </div>
-
-            @* Mobile Menu Button (Functionality not implemented here) *@
-            <div class="-mr-2 flex items-center sm:hidden">
-                <button type="button" class="relative inline-flex items-center justify-center rounded-md bg-white p-2 text-primary hover:bg-gray-100 hover:text-secondary focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2" aria-controls="mobile-menu" aria-expanded="false">
-                    <span class="absolute -inset-0.5"></span>
-                    <span class="sr-only">Open main menu</span>
-                    @* Icon when menu is closed - Heroicon menu *@
-                    <svg class="block h-6 w-6" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" /></svg>
-                    @* Icon when menu is open - Heroicon x-mark *@
-                    @* <svg class="hidden h-6 w-6" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg> *@
-                </button>
-            </div>
-
-        </div>
-    </div>
-
-    @* Mobile Menu (Hidden by default, needs JS/Blazor logic to toggle) *@
-    <div class="sm:hidden hidden" id="mobile-menu">
-        @* Add 'hidden' class initially *@
-        <div class="space-y-1 px-2 pb-3 pt-2">
-            <a href="/about-us" class="block rounded-md px-3 py-2 text-base font-medium text-primary hover:bg-gray-100 hover:text-secondary">About Us</a>
-            <a href="/blog" class="block rounded-md px-3 py-2 text-base font-medium text-primary hover:bg-gray-100 hover:text-secondary">Blog</a>
-            <a href="/contact" class="block rounded-md px-3 py-2 text-base font-medium text-primary hover:bg-gray-100 hover:text-secondary">Contact</a>
-        </div>
-        @* Mobile Login Display Separately? *@
-        <div class="border-t border-subtle px-4 py-3">
-            <LoginDisplay />
-        </div>
-    </div>
-</nav>
+        </nav>
+    </NotAuthorized>
+    @* Authorized section is intentionally empty - Admins/Staff don't see this specific NavBar *@
+</AuthorizeView>
 
 
 @code {
-    // Code for NavBar component if needed (e.g., mobile menu toggle logic)
-    // Example (needs more implementation):
-    // private bool isMobileMenuOpen = false;
-    // private void ToggleMobileMenu() => isMobileMenuOpen = !isMobileMenuOpen;
-    // private string MobileMenuCssClass => isMobileMenuOpen ? "" : "hidden";
+    private bool isMobileMenuOpen = false;
+    private void ToggleMobileMenu() => isMobileMenuOpen = !isMobileMenuOpen;
+    private string MobileMenuCssClass => isMobileMenuOpen ? "" : "hidden"; // Basic toggle logic
 }

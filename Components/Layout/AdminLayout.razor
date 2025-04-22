@@ -1,20 +1,20 @@
 ﻿@* File: Components/Layout/AdminLayout.razor *@
+@using System.Security.Claims
 @using Microsoft.AspNetCore.Components.Sections
-@*@using Microsoft.AspNetCore.Components.Authorization*@ @* Commented out for now *@
-
+@using Microsoft.AspNetCore.Components.Authorization
 @inherits LayoutComponentBase
+
+@* Inject AuthenticationStateProvider to get detailed user info in @code block if needed,
+   but AuthorizeView provides 'context' which is often sufficient *@
+@inject AuthenticationStateProvider AuthStateProvider
 
 <RadzenDialog />
 <RadzenNotification />
 <RadzenContextMenu />
 <RadzenTooltip />
 
-@* Apply theme background and base font *@
 <div class="flex min-h-screen bg-background font-sans">
-
-    @* Sidebar Navigation - Use a subtle contrasting background *@
     <aside class="w-64 flex-shrink-0 bg-white dark:bg-gray-800 p-4 border-e border-subtle dark:border-gray-700 flex flex-col">
-
         <div class="mb-4 text-center">
             <a href="/admin" class="inline-block">
                 <img src="/images/Using-this-logo-during-dev.jpg" alt="Lehman Logo" class="h-10 mx-auto" />
@@ -22,76 +22,64 @@
             <p class="mt-2 text-sm font-semibold text-primary dark:text-gray-200">Admin Panel</p>
         </div>
 
-        @* <AuthorizeView> Commented out for now
+        @* Use AuthorizeView to display user name and Role(s) *@
+        <AuthorizeView Roles="Admin, Marketing, OfficeAdmin, Accounting">
+            @* Assume only staff access admin layout *@
             <Authorized>
-                <p class="mb-4 text-xs text-center text-secondary dark:text-gray-400">
-                    Welcome, @context.User?.Identity?.Name!
-                </p>
+                @{
+                    // Use @code block logic at the start of Authorized
+                    var userName = context.User.Identity?.Name ?? "User";
+                    var userRoles = context.User.FindAll(ClaimTypes.Role).Select(c => c.Value);
+                    var rolesString = string.Join(", ", userRoles);
+                    if (string.IsNullOrEmpty(rolesString)) { rolesString = "Authenticated"; } // Fallback if no roles found
+                }
+                <div class="mb-4 text-xs text-center text-secondary dark:text-gray-400">
+                    <div>Welcome,</div>
+                    <div class="font-medium text-primary dark:text-gray-200 truncate" title="@userName">
+                        @userName
+                    </div>
+                    <div class="text-accent dark:text-accent-light text-[10px] italic mt-1">
+                        (@rolesString) @* Display the pre-formatted string *@
+                    </div>
+                </div>
             </Authorized>
-        </AuthorizeView> *@
-        <p class="mb-4 text-xs text-center text-secondary dark:text-gray-400">
-            Welcome, Admin! @* Placeholder *@
-        </p>
-
+            <NotAuthorized>
+                <p class="mb-4 text-xs text-center text-secondary dark:text-gray-400"> Not Logged In </p>
+            </NotAuthorized>
+        </AuthorizeView>
 
         <hr class="border-subtle dark:border-gray-600 my-2">
 
         <nav class="flex-grow flex flex-col space-y-1">
-
-            <NavLink href="admin" Match="NavLinkMatch.All"
-                     class="flex items-center px-3 py-2 rounded-md text-sm font-medium text-primary dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
-                     ActiveClass="bg-gray-100 dark:bg-gray-700 text-accent dark:text-accent font-semibold">
-                <span class="ml-3">Dashboard</span>
-            </NavLink>
-
-            <NavLink href="admin/blog" Match="NavLinkMatch.Prefix"
-                     class="flex items-center px-3 py-2 rounded-md text-sm font-medium text-primary dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
-                     ActiveClass="bg-gray-100 dark:bg-gray-700 text-accent dark:text-accent font-semibold">
-                <span class="ml-3">Manage Blog Posts</span>
-            </NavLink>
-
-            <NavLink href="admin/categories" Match="NavLinkMatch.Prefix"
-                     class="flex items-center px-3 py-2 rounded-md text-sm font-medium text-primary dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
-                     ActiveClass="bg-gray-100 dark:bg-gray-700 text-accent dark:text-accent font-semibold">
-                <span class="ml-3">Manage Categories</span>
-            </NavLink>
-
-            <NavLink href="admin/contacts" Match="NavLinkMatch.Prefix"
-                     class="flex items-center px-3 py-2 rounded-md text-sm font-medium text-primary dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
-                     ActiveClass="bg-gray-100 dark:bg-gray-700 text-accent dark:text-accent font-semibold">
-                <span class="ml-3">Manage Contacts</span>
-            </NavLink>
-
-            @* --- MODIFIED LINK --- *@
-            <NavLink href="admin/customers" Match="NavLinkMatch.Prefix"
-                     class="flex items-center px-3 py-2 rounded-md text-sm font-medium text-primary dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
-                     ActiveClass="bg-gray-100 dark:bg-gray-700 text-accent dark:text-accent font-semibold">
-                <span class="ml-3">Manage Customers</span> @* <-- Changed Text *@
-            </NavLink>
-            @* --- END MODIFIED LINK --- *@
-
-            @* Add other admin links here *@
+            @* Role-based nav links here (as provided before) *@
+            <NavLink href="admin" Match="NavLinkMatch.All" class="flex items-center px-3 py-2 rounded-md text-sm font-medium text-primary dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700" ActiveClass="bg-gray-100 dark:bg-gray-700 text-accent dark:text-accent font-semibold"> <span class="ml-3">Dashboard</span> </NavLink>
+            <AuthorizeView Roles="Admin, Marketing"><NavLink href="admin/blog" Match="NavLinkMatch.Prefix" class="..."> <span class="ml-3">Manage Blog Posts</span> </NavLink></AuthorizeView>
+            <AuthorizeView Roles="Admin, Marketing"><NavLink href="admin/categories" Match="NavLinkMatch.Prefix" class="..."> <span class="ml-3">Manage Categories</span> </NavLink></AuthorizeView>
+            <AuthorizeView Roles="Admin, OfficeAdmin, Marketing"><NavLink href="admin/contacts" Match="NavLinkMatch.Prefix" class="..."> <span class="ml-3">Manage Contacts</span> </NavLink></AuthorizeView>
+            <AuthorizeView Roles="Admin, OfficeAdmin, Accounting"><NavLink href="admin/customers" Match="NavLinkMatch.Prefix" class="..."> <span class="ml-3">Manage Customers</span> </NavLink></AuthorizeView>
         </nav>
 
         <div class="mt-auto pt-4 border-t border-subtle dark:border-gray-600">
-            <button @* @onclick="HandleLogout" *@ @* Commented out for now *@
-                    class="w-full flex items-center justify-center px-3 py-2 rounded-md text-sm font-medium text-red-700 dark:text-red-400 bg-red-100 dark:bg-red-900 hover:bg-red-200 dark:hover:bg-red-800">
-                Logout (Placeholder)
-            </button>
+            @* Logout form requires AuthorizeView to access AntiforgeryToken if needed within context, or place outside *@
+            <AuthorizeView>
+                <Authorized>
+                    <form action="/Account/Logout" method="post">
+                        <AntiforgeryToken />
+                        <button type="submit" class="w-full flex items-center justify-center px-3 py-2 rounded-md text-sm font-medium text-red-700 dark:text-red-400 bg-red-100 dark:bg-red-900 hover:bg-red-200 dark:hover:bg-red-800"> Logout </button>
+                    </form>
+                </Authorized>
+                <NotAuthorized>
+                    <a href="/Account/Login" class="w-full flex items-center justify-center px-3 py-2 rounded-md text-sm font-medium text-primary dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"> Login Required </a>
+                </NotAuthorized>
+            </AuthorizeView>
         </div>
     </aside>
 
-    @* Main Content Area *@
     <main class="flex-1 p-6 md:p-8 lg:p-10 overflow-y-auto bg-background dark:bg-gray-900">
         <div class="text-primary dark:text-gray-100">
             @Body
         </div>
     </main>
-
 </div>
 
-@code {
-    // @inject AuthenticationStateProvider AuthenticationStateProvider // Commented out for now
-    // @inject NavigationManager NavigationManager // Commented out for now
-    // private async Task HandleLogout() { ... } // Commented out for now
-}
+@* @code { } *@

@@ -1,17 +1,14 @@
 ﻿@* File: Components/Layout/PortalLayout.razor *@
 @inherits LayoutComponentBase
 @using Microsoft.AspNetCore.Components.Authorization
-@inject NavigationManager NavManager
+@inject NavigationManager NavManager // Keep if needed by other parts
 
-<RadzenNotification />
+<RadzenNotification /> @* Ensure this is present *@
+<RadzenDialog /> @* Add others if needed *@
 
 <div class="flex min-h-screen bg-gray-100 dark:bg-gray-800 font-sans">
-    @* Lighter background than admin *@
 
-    @* --- Portal Sidebar --- *@
     <aside class="w-56 flex-shrink-0 bg-white dark:bg-gray-900 p-4 border-e border-subtle dark:border-gray-700 flex flex-col">
-
-        @* Logo/Link Back to Public Home *@
         <div class="mb-6 text-center">
             <a href="/" class="inline-block">
                 <img src="/images/Using-this-logo-during-dev.jpg" alt="Lehman Logo" class="h-10 mx-auto" />
@@ -22,13 +19,18 @@
         @* User Welcome *@
         <AuthorizeView>
             <Authorized>
-                <p class="mb-4 text-sm text-center text-primary dark:text-gray-200">
-                    Welcome,<br> <span class="font-medium">@context.User?.Identity?.Name</span>
-                </p>
+                <div class="mb-4 text-sm text-center text-primary dark:text-gray-200">
+                    <div>Welcome,</div>
+                    <div class="font-medium truncate" title="@context.User?.Identity?.Name">
+                        @context.User?.Identity?.Name
+                    </div>
+                    @* No need to display role for customer usually *@
+                </div>
             </Authorized>
             <NotAuthorized>
-                @* Should ideally not happen if layout is protected, but fallback *@
                 <p class="mb-4 text-sm text-center text-secondary">Please log in.</p>
+                @* Optional: Add login link here if sidebar is always visible *@
+                @* <a href="/Account/Login" class="...">Login</a> *@
             </NotAuthorized>
         </AuthorizeView>
 
@@ -36,63 +38,40 @@
 
         @* Portal Navigation *@
         <nav class="flex-grow flex flex-col space-y-1">
-
-            <NavLink href="/portal" Match="NavLinkMatch.All"
-                     class="flex items-center px-3 py-2 rounded-md text-sm font-medium text-primary dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
-                     ActiveClass="bg-gray-100 dark:bg-gray-700 text-accent dark:text-accent font-semibold">
-                @* Optional Icon Placeholder: <span class="mr-2">ICON</span> *@
-                <span>Dashboard</span>
-            </NavLink>
-
-            <NavLink href="/portal/documents" Match="NavLinkMatch.Prefix"
-                     class="flex items-center px-3 py-2 rounded-md text-sm font-medium text-primary dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
-                     ActiveClass="bg-gray-100 dark:bg-gray-700 text-accent dark:text-accent font-semibold">
-                @* Optional Icon Placeholder: <span class="mr-2">ICON</span> *@
-                <span>Project Documents</span>
-            </NavLink>
-
-            <NavLink href="/portal/messages" Match="NavLinkMatch.Prefix"
-                     class="flex items-center px-3 py-2 rounded-md text-sm font-medium text-primary dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
-                     ActiveClass="bg-gray-100 dark:bg-gray-700 text-accent dark:text-accent font-semibold">
-                @* Optional Icon Placeholder: <span class="mr-2">ICON</span> *@
-                <span>Messages</span>
-            </NavLink>
-
-            <NavLink href="/Account/Manage" Match="NavLinkMatch.Prefix" 
-                     class="flex items-center px-3 py-2 rounded-md text-sm font-medium text-primary dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
-                     ActiveClass="bg-gray-100 dark:bg-gray-700 text-accent dark:text-accent font-semibold">
-                @* Optional Icon Placeholder: <span class="mr-2">ICON</span> *@
-                <span>My Account</span>
-            </NavLink>
-
+            @* Show links only when authorized *@
+            <AuthorizeView>
+                <Authorized>
+                    <NavLink href="/portal" Match="NavLinkMatch.All" class="flex items-center px-3 py-2 rounded-md text-sm font-medium text-primary dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700" ActiveClass="bg-gray-100 dark:bg-gray-700 text-accent dark:text-accent font-semibold"> <span>Dashboard</span> </NavLink>
+                    <NavLink href="/portal/documents" Match="NavLinkMatch.Prefix" class="flex items-center px-3 py-2 rounded-md text-sm font-medium text-primary dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700" ActiveClass="bg-gray-100 dark:bg-gray-700 text-accent dark:text-accent font-semibold"> <span>Project Documents</span> </NavLink>
+                    <NavLink href="/portal/messages" Match="NavLinkMatch.Prefix" class="flex items-center px-3 py-2 rounded-md text-sm font-medium text-primary dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700" ActiveClass="bg-gray-100 dark:bg-gray-700 text-accent dark:text-accent font-semibold"> <span>Messages</span> </NavLink>
+                    <NavLink href="/Account/Manage" Match="NavLinkMatch.Prefix" class="flex items-center px-3 py-2 rounded-md text-sm font-medium text-primary dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700" ActiveClass="bg-gray-100 dark:bg-gray-700 text-accent dark:text-accent font-semibold"> <span>My Account</span> </NavLink>
+                </Authorized>
+            </AuthorizeView>
         </nav>
 
-        @* Logout Button/Link - Link to Identity endpoint *@
+        @* Logout Button/Link *@
         <div class="mt-auto pt-4 border-t border-subtle dark:border-gray-600">
-            @* Use a form for logout as recommended by Identity Scaffolding *@
-            <form action="/Account/Logout" method="post">
-                <AntiforgeryToken />
-                <input type="hidden" name="ReturnUrl" value="/" />
-                <button type="submit"
-                        class="w-full flex items-center justify-center px-3 py-2 rounded-md text-sm font-medium text-secondary dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700">
-                    @* Optional Icon Placeholder: <span class="mr-2">ICON</span> *@
-                    Logout
-                </button>
-            </form>
+            <AuthorizeView>
+                <Authorized>
+                    <form action="/Account/Logout" method="post">
+                        <AntiforgeryToken />
+                        <input type="hidden" name="ReturnUrl" value="/" /> @* Redirect to home after logout *@
+                        <button type="submit" class="w-full flex items-center justify-center px-3 py-2 rounded-md text-sm font-medium text-secondary dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700"> Logout </button>
+                    </form>
+                </Authorized>
+                <NotAuthorized>
+                    <a href="/Account/Login" class="w-full flex items-center justify-center px-3 py-2 rounded-md text-sm font-medium text-primary dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"> Login </a>
+                </NotAuthorized>
+            </AuthorizeView>
         </div>
     </aside>
 
-    @* Main Content Area for Portal Pages *@
+    @* Main Content Area *@
     <main class="flex-1 p-6 md:p-8 lg:p-10 overflow-y-auto bg-background">
-        @* Use main theme background *@
         <div class="text-primary">
-            @* Set default text color *@
             @Body
         </div>
     </main>
-
 </div>
 
-@code {
-    // Code for PortalLayout if needed
-}
+@* @code { } *@
