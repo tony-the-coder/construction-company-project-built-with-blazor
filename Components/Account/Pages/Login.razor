@@ -1,0 +1,136 @@
+﻿@* @page "/Account/Login" *@
+@layout MainLayout
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
+
+@using System.ComponentModel.DataAnnotations
+@using Microsoft.AspNetCore.Identity
+@using LehmanCustomConstruction.Data
+@using Microsoft.AspNetCore.Components.Forms
+
+@inject SignInManager<ApplicationUser> SignInManager
+@inject UserManager<ApplicationUser> UserManager
+@inject ILogger<Login> Logger
+@inject NavigationManager NavigationManager
+
+<PageTitle>Log in</PageTitle>
+
+<div class="container mx-auto max-w-md my-10 p-6 bg-white dark:bg-gray-800 shadow-md rounded-lg">
+    <h1 class="text-2xl font-semibold text-center mb-6 text-primary dark:text-gray-100">Log In</h1>
+
+    <section>
+        @if (!string.IsNullOrEmpty(errorMessage))
+        {
+            <div class="text-red-600 dark:text-red-400 mb-4">@errorMessage</div>
+        }
+
+        <EditForm Model="Input" OnValidSubmit="HandleLogin">
+            <DataAnnotationsValidator />
+            <ValidationSummary class="text-red-600 dark:text-red-400 mb-3" />
+
+            <div class="mb-4">
+                <label for="email" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Email</label>
+                <InputText @bind-Value="Input.Email" id="email" class="block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:ring-primary focus:border-primary sm:text-sm" autocomplete="username" />
+                <ValidationMessage For="() => Input.Email" class="text-red-600 dark:text-red-400 text-xs mt-1" />
+            </div>
+
+            <div class="mb-4">
+                <label for="password" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Password</label>
+                <InputText @bind-Value="Input.Password" id="password" type="password" class="block w-full rounded-md border-gray-300 dark:border-gray-600 shadow-sm focus:ring-primary focus:border-primary sm:text-sm" autocomplete="current-password" />
+                <ValidationMessage For="() => Input.Password" class="text-red-600 dark:text-red-400 text-xs mt-1" />
+            </div>
+
+            <div class="flex items-center mb-4">
+                <InputCheckbox @bind-Value="Input.RememberMe" id="rememberme" class="h-4 w-4 text-primary focus:ring-primary border-gray-300 rounded" />
+                <label for="rememberme" class="ml-2 block text-sm text-gray-700 dark:text-gray-300">Remember me</label>
+            </div>
+
+            <button type="submit" class="w-full bg-primary text-white py-2 px-4 rounded-md hover:bg-primary-dark focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary disabled:opacity-50" disabled="@isBusy">
+                @if (isBusy)
+                {
+                    <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                }
+                Log in
+            </button>
+        </EditForm>
+
+        <div class="text-center mt-4 text-sm">
+            <p><a href="Account/ForgotPassword" class="text-primary hover:underline">Forgot your password?</a></p>
+            <p><a href="Account/Register" class="text-primary hover:underline">Register as a new user</a></p>
+        </div>
+    </section>
+</div>
+
+@code {
+    private string? errorMessage;
+    private bool isBusy = false;
+
+    private InputModel Input { get; set; } = new();
+
+    private async Task HandleLogin()
+    {
+        if (isBusy) return;
+
+        isBusy = true;
+        errorMessage = null;
+
+        try
+        {
+            var user = await UserManager.FindByEmailAsync(Input.Email);
+            if (user == null)
+            {
+                errorMessage = "Invalid login attempt.";
+                return;
+            }
+
+            if (SignInManager.Options.SignIn.RequireConfirmedAccount && !await UserManager.IsEmailConfirmedAsync(user))
+            {
+                errorMessage = "You need to confirm your email before logging in.";
+                return;
+            }
+
+            var result = await SignInManager.PasswordSignInAsync(Input.Email, Input.Password, Input.RememberMe, lockoutOnFailure: false);
+
+            if (result.Succeeded)
+            {
+                Logger.LogInformation("User logged in successfully.");
+                // Redirect to a new page to avoid modifying headers in Blazor Server
+                NavigationManager.NavigateTo("/", forceLoad: true);
+            }
+            else if (result.IsLockedOut)
+            {
+                errorMessage = "Your account is locked out.";
+            }
+            else if (result.RequiresTwoFactor)
+            {
+                NavigationManager.NavigateTo("Account/LoginWith2fa", forceLoad: true);
+            }
+            else
+            {
+                errorMessage = "Invalid login attempt.";
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "An error occurred during login.");
+            errorMessage = "An unexpected error occurred. Please try again.";
+        }
+        finally
+        {
+            isBusy = false;
+        }
+    }
+
+
+    private class InputModel
+    {
+        [Required]
+        [EmailAddress]
+        public string Email { get; set; } = string.Empty;
+
+        [Required]
+        [DataType(DataType.Password)]
+        public string Password { get; set; } = string.Empty;
+
+        public bool RememberMe { get; set; }
+    }
+}
